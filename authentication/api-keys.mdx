@@ -1,0 +1,560 @@
+---
+title: 'API Keys'
+description: 'Generate and manage API keys for programmatic access'
+---
+
+# API Key Authentication
+
+API keys provide a simple way to authenticate requests to the FLTR API. They're perfect for server-side applications, scripts, and integrations.
+
+## Quick Start
+
+<Steps>
+  <Step title="Generate an API Key">
+    1. Log in to [app.fltr.com](https://app.fltr.com)
+    2. Navigate to **Settings** → **API Keys**
+    3. Click **Create API Key**
+    4. Give your key a descriptive name
+    5. Copy and save the key securely
+  </Step>
+
+  <Step title="Use the API Key">
+    Include your API key in the Authorization header:
+
+    ```bash
+    curl https://api.fltr.com/v1/datasets \
+      -H "Authorization: Bearer fltr_sk_abc123..."
+    ```
+  </Step>
+
+  <Step title="Test Your Key">
+    Verify the key works by listing your datasets:
+
+    ```bash
+    curl https://api.fltr.com/v1/datasets \
+      -H "Authorization: Bearer YOUR_API_KEY"
+    ```
+  </Step>
+</Steps>
+
+## API Key Format
+
+FLTR API keys follow this format:
+
+```
+fltr_sk_1234567890abcdefghijklmnop
+│    │  └────────────────────────── Unique identifier (30 chars)
+│    └───────────────────────────── Secret key indicator
+└────────────────────────────────── FLTR prefix
+```
+
+- **Prefix**: `fltr_` identifies the key as a FLTR credential
+- **Type**: `sk` indicates a secret key
+- **ID**: Random alphanumeric string
+
+## Using API Keys
+
+### In HTTP Requests
+
+Include the API key in the `Authorization` header with the `Bearer` scheme:
+
+```bash
+Authorization: Bearer fltr_sk_abc123...
+```
+
+<CodeGroup>
+
+```bash cURL
+curl https://api.fltr.com/v1/datasets \
+  -H "Authorization: Bearer fltr_sk_abc123..." \
+  -H "Content-Type: application/json"
+```
+
+```python Python
+import requests
+
+API_KEY = "fltr_sk_abc123..."
+headers = {
+    "Authorization": f"Bearer {API_KEY}",
+    "Content-Type": "application/json"
+}
+
+response = requests.get(
+    "https://api.fltr.com/v1/datasets",
+    headers=headers
+)
+```
+
+```javascript JavaScript
+const API_KEY = "fltr_sk_abc123...";
+
+const response = await fetch("https://api.fltr.com/v1/datasets", {
+  headers: {
+    "Authorization": `Bearer ${API_KEY}`,
+    "Content-Type": "application/json"
+  }
+});
+```
+
+```go Go
+package main
+
+import (
+    "net/http"
+)
+
+func main() {
+    apiKey := "fltr_sk_abc123..."
+
+    req, _ := http.NewRequest("GET", "https://api.fltr.com/v1/datasets", nil)
+    req.Header.Set("Authorization", "Bearer " + apiKey)
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, _ := client.Do(req)
+    defer resp.Body.Close()
+}
+```
+
+</CodeGroup>
+
+### Environment Variables
+
+Store API keys in environment variables, never hard-code them:
+
+<CodeGroup>
+
+```bash Shell
+# .env file
+FLTR_API_KEY=fltr_sk_abc123...
+
+# Load in shell
+export FLTR_API_KEY="fltr_sk_abc123..."
+```
+
+```python Python
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+API_KEY = os.getenv("FLTR_API_KEY")
+```
+
+```javascript JavaScript
+// Using dotenv
+require('dotenv').config();
+
+const API_KEY = process.env.FLTR_API_KEY;
+```
+
+</CodeGroup>
+
+### SDK Usage
+
+<Info>
+Official SDKs are coming soon. For now, use the REST API directly with your preferred HTTP client.
+</Info>
+
+## Key Management
+
+### Creating Keys
+
+You can have multiple API keys for different purposes:
+
+**Recommended naming conventions:**
+- `production-api` - Production server
+- `staging-api` - Staging environment
+- `ci-cd-pipeline` - Automated testing
+- `zapier-integration` - Zapier workflows
+
+**Per environment:**
+- Create separate keys for dev, staging, and production
+- Easier to rotate compromised keys
+- Better audit trail in logs
+
+### Rotating Keys
+
+Rotate API keys regularly for security:
+
+<Steps>
+  <Step title="Create New Key">
+    Generate a new API key in the dashboard with the same name + date:
+    ```
+    production-api-2024-01
+    ```
+  </Step>
+
+  <Step title="Update Applications">
+    Deploy the new key to your applications one environment at a time:
+    1. Staging first
+    2. Test thoroughly
+    3. Then production
+  </Step>
+
+  <Step title="Monitor Usage">
+    Verify the old key shows zero usage after migration
+  </Step>
+
+  <Step title="Revoke Old Key">
+    Delete the old key once you've confirmed the new key works
+  </Step>
+</Steps>
+
+<Tip>
+Set a calendar reminder to rotate keys every 90 days.
+</Tip>
+
+### Revoking Keys
+
+Revoke compromised keys immediately:
+
+1. Go to **Settings** → **API Keys**
+2. Find the compromised key
+3. Click **Delete** or **Revoke**
+4. Generate a new key to replace it
+
+**When to revoke:**
+- ✅ Key accidentally committed to GitHub
+- ✅ Key shared via insecure channel
+- ✅ Employee with access leaves
+- ✅ Suspected unauthorized access
+- ✅ Compliance requirements
+
+## Rate Limits
+
+API key requests are limited to **1,000 requests per hour** per account.
+
+### Checking Your Limit
+
+Response headers show your current rate limit status:
+
+```bash
+HTTP/1.1 200 OK
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 847
+X-RateLimit-Reset: 1704657600
+```
+
+- `X-RateLimit-Limit`: Total requests allowed per hour
+- `X-RateLimit-Remaining`: Requests remaining in current window
+- `X-RateLimit-Reset`: Unix timestamp when limit resets
+
+### Handling Rate Limits
+
+When you exceed the limit, you'll receive a 429 error:
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "retry_after": 1847,
+  "code": "rate_limit_exceeded"
+}
+```
+
+**Best practices:**
+
+<CodeGroup>
+
+```python Python
+import time
+import requests
+
+def make_request_with_backoff(url, headers, max_retries=3):
+    for attempt in range(max_retries):
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 429:
+            retry_after = int(response.headers.get('Retry-After', 60))
+            print(f"Rate limited. Waiting {retry_after}s...")
+            time.sleep(retry_after)
+            continue
+
+        return response
+
+    raise Exception("Max retries exceeded")
+```
+
+```javascript JavaScript
+async function makeRequestWithBackoff(url, headers, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const response = await fetch(url, { headers });
+
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After') || 60;
+      console.log(`Rate limited. Waiting ${retryAfter}s...`);
+      await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+      continue;
+    }
+
+    return response;
+  }
+
+  throw new Error('Max retries exceeded');
+}
+```
+
+</CodeGroup>
+
+### Increasing Limits
+
+Need more than 1,000 requests per hour?
+
+<CardGroup cols={2}>
+  <Card title="Upgrade to OAuth" icon="arrow-up" href="/authentication/oauth">
+    Get 15,000 requests/hour with OAuth 2.1
+  </Card>
+
+  <Card title="Contact Sales" icon="envelope" href="mailto:sales@fltr.com">
+    Enterprise plans with custom limits
+  </Card>
+</CardGroup>
+
+## Security Best Practices
+
+### ✅ Do's
+
+<AccordionGroup>
+  <Accordion title="Store keys in environment variables">
+    Never hard-code API keys in your source code:
+
+    ```python
+    # ✅ Good
+    import os
+    API_KEY = os.getenv("FLTR_API_KEY")
+
+    # ❌ Bad
+    API_KEY = "fltr_sk_abc123..."
+    ```
+  </Accordion>
+
+  <Accordion title="Use different keys per environment">
+    Separate keys for development, staging, and production:
+
+    ```bash
+    # Development
+    FLTR_API_KEY=fltr_sk_dev_123...
+
+    # Production
+    FLTR_API_KEY=fltr_sk_prod_456...
+    ```
+  </Accordion>
+
+  <Accordion title="Rotate keys regularly">
+    Set up a key rotation schedule:
+
+    - Every 90 days for production keys
+    - After employee departures
+    - After security incidents
+  </Accordion>
+
+  <Accordion title="Use .gitignore for .env files">
+    Prevent accidental commits:
+
+    ```bash
+    # .gitignore
+    .env
+    .env.local
+    .env.*.local
+    ```
+  </Accordion>
+
+  <Accordion title="Implement key scanning">
+    Use tools to detect leaked keys:
+
+    - GitHub Secret Scanning
+    - GitGuardian
+    - TruffleHog
+    - Pre-commit hooks
+  </Accordion>
+</AccordionGroup>
+
+### ❌ Don'ts
+
+<Warning>
+**Never** do these things with API keys:
+</Warning>
+
+- ❌ Commit keys to version control (Git, SVN, etc.)
+- ❌ Embed keys in client-side JavaScript
+- ❌ Share keys via email, Slack, or chat
+- ❌ Use the same key across multiple projects
+- ❌ Post keys in GitHub issues or Stack Overflow
+- ❌ Store keys in plain text files on servers
+
+### Compromised Keys
+
+If you accidentally expose an API key:
+
+<Steps>
+  <Step title="Revoke Immediately">
+    Go to Settings → API Keys and delete the compromised key
+  </Step>
+
+  <Step title="Generate New Key">
+    Create a replacement key with a new name
+  </Step>
+
+  <Step title="Update Applications">
+    Deploy the new key to all services using the old key
+  </Step>
+
+  <Step title="Audit Access">
+    Check logs for suspicious activity with the compromised key
+  </Step>
+
+  <Step title="Notify Team">
+    Alert your team and review security practices
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Invalid API Key Error
+
+```json
+{
+  "error": "Invalid API key",
+  "code": "invalid_api_key"
+}
+```
+
+**Causes:**
+- Key was revoked or deleted
+- Incorrect key format
+- Missing "Bearer" prefix
+- Extra whitespace in key
+
+**Solutions:**
+```bash
+# ✅ Correct format
+Authorization: Bearer fltr_sk_abc123...
+
+# ❌ Wrong - missing "Bearer"
+Authorization: fltr_sk_abc123...
+
+# ❌ Wrong - extra colon
+Authorization: Bearer: fltr_sk_abc123...
+
+# ❌ Wrong - extra whitespace
+Authorization: Bearer  fltr_sk_abc123...
+```
+
+### Key Not Working After Creation
+
+**Wait 5-10 seconds** after creating a key for it to propagate across our systems.
+
+### Multiple Keys Not Increasing Limit
+
+Rate limits are **per account**, not per key. Creating multiple API keys doesn't increase your rate limit from 1,000 requests/hour.
+
+To get higher limits, use [OAuth authentication](/authentication/oauth) (15,000 req/hour).
+
+## Integration Examples
+
+### Zapier
+
+<CodeGroup>
+
+```text Webhooks by Zapier
+URL: https://api.fltr.com/v1/mcp/query
+Method: POST
+Headers:
+  Authorization: Bearer YOUR_API_KEY
+  Content-Type: application/json
+Body:
+{
+  "query": "{{input_text}}",
+  "dataset_id": "ds_abc123",
+  "limit": 5
+}
+```
+
+</CodeGroup>
+
+### GitHub Actions
+
+```yaml
+name: Query FLTR
+
+on: [push]
+
+jobs:
+  query:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query FLTR API
+        env:
+          FLTR_API_KEY: ${{ secrets.FLTR_API_KEY }}
+        run: |
+          curl https://api.fltr.com/v1/datasets \
+            -H "Authorization: Bearer $FLTR_API_KEY"
+```
+
+Add `FLTR_API_KEY` to your repository secrets.
+
+### Docker
+
+```dockerfile
+FROM python:3.11-slim
+
+# API key passed as build arg or runtime env var
+ARG FLTR_API_KEY
+ENV FLTR_API_KEY=${FLTR_API_KEY}
+
+COPY . /app
+WORKDIR /app
+
+RUN pip install -r requirements.txt
+
+CMD ["python", "app.py"]
+```
+
+Run with:
+```bash
+docker run -e FLTR_API_KEY=fltr_sk_abc123... my-app
+```
+
+## FAQ
+
+<AccordionGroup>
+  <Accordion title="Can I use multiple API keys?">
+    Yes, you can create multiple API keys for different services, but they all share the same 1,000 req/hour rate limit.
+  </Accordion>
+
+  <Accordion title="Do API keys expire?">
+    No, API keys don't expire automatically. Rotate them manually for security.
+  </Accordion>
+
+  <Accordion title="Can I restrict API key permissions?">
+    Not yet. API keys have full access to your account. Use OAuth for scope-based permissions.
+  </Accordion>
+
+  <Accordion title="What happens to requests when I revoke a key?">
+    All requests using that key will immediately return 401 Unauthorized errors.
+  </Accordion>
+
+  <Accordion title="Can I see usage per API key?">
+    Currently, usage is tracked per account, not per key. Per-key analytics are coming soon.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/quickstart/getting-started">
+    Make your first API call with your new key
+  </Card>
+
+  <Card title="OAuth Setup" icon="shield" href="/authentication/oauth">
+    Upgrade to OAuth for higher rate limits
+  </Card>
+
+  <Card title="Rate Limits" icon="gauge" href="/support/rate-limits">
+    Learn more about rate limiting
+  </Card>
+
+  <Card title="API Reference" icon="book" href="/api-reference/introduction">
+    Explore all available endpoints
+  </Card>
+</CardGroup>

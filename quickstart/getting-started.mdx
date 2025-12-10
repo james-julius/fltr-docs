@@ -1,0 +1,336 @@
+---
+title: 'Getting Started'
+description: 'Start using FLTR in 5 minutes with your first dataset and query'
+---
+
+# Getting Started with FLTR
+
+This guide will walk you through creating your first dataset, uploading a document, and running semantic search queries using the FLTR API.
+
+## Prerequisites
+
+Before you begin, make sure you have:
+- A FLTR account (sign up at [app.fltr.com](https://app.fltr.com))
+- An API key (we'll generate one in the next step)
+- Basic familiarity with REST APIs
+
+## Step 1: Generate an API Key
+
+1. Log in to your [FLTR Dashboard](https://app.fltr.com)
+2. Navigate to **Settings** → **API Keys**
+3. Click **Create API Key**
+4. Give your key a descriptive name (e.g., "Development Key")
+5. Copy and save your API key securely
+
+<Warning>
+API keys grant full access to your account. Never share them publicly or commit them to version control. Use environment variables to store them securely.
+</Warning>
+
+## Step 2: Create Your First Dataset
+
+Datasets are containers for related documents. Let's create one using curl:
+
+```bash
+curl -X POST https://api.fltr.com/v1/datasets \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My First Dataset",
+    "description": "Testing FLTR semantic search",
+    "is_public": false
+  }'
+```
+
+The response will include a `dataset_id` - save this for the next steps:
+
+```json
+{
+  "id": "ds_abc123",
+  "name": "My First Dataset",
+  "description": "Testing FLTR semantic search",
+  "is_public": false,
+  "created_at": "2024-01-10T12:00:00Z"
+}
+```
+
+## Step 3: Upload a Document
+
+Now let's add a document to your dataset. You can upload text, PDFs, or images:
+
+### Option A: Upload Text Content
+
+```bash
+curl -X POST https://api.fltr.com/v1/datasets/ds_abc123/documents \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "FLTR is a powerful semantic search platform that makes your documents AI-ready. It supports hybrid search combining vector similarity and keyword matching.",
+    "metadata": {
+      "title": "About FLTR",
+      "category": "documentation"
+    }
+  }'
+```
+
+### Option B: Upload a File
+
+```bash
+curl -X POST https://api.fltr.com/v1/datasets/ds_abc123/documents \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "file=@/path/to/document.pdf" \
+  -F 'metadata={"title":"My Document","category":"research"}'
+```
+
+The API will automatically:
+- Extract text from PDFs and images
+- Chunk the content into searchable segments
+- Generate vector embeddings
+- Index for hybrid search
+
+<Info>
+Document processing happens asynchronously. Large files may take a few seconds to become searchable.
+</Info>
+
+## Step 4: Run Your First Query
+
+Now you can search your dataset using semantic search:
+
+```bash
+curl -X POST https://api.fltr.com/v1/mcp/query \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What is FLTR?",
+    "dataset_id": "ds_abc123",
+    "limit": 5
+  }'
+```
+
+Response:
+
+```json
+{
+  "results": [
+    {
+      "chunk_id": "ch_xyz789",
+      "content": "FLTR is a powerful semantic search platform that makes your documents AI-ready...",
+      "score": 0.89,
+      "metadata": {
+        "title": "About FLTR",
+        "category": "documentation"
+      },
+      "document_id": "doc_def456"
+    }
+  ],
+  "total": 1,
+  "query_time_ms": 45
+}
+```
+
+## Code Examples
+
+<CodeGroup>
+
+```python Python
+import requests
+
+# Configuration
+API_KEY = "your_api_key_here"
+BASE_URL = "https://api.fltr.com/v1"
+headers = {
+    "Authorization": f"Bearer {API_KEY}",
+    "Content-Type": "application/json"
+}
+
+# Create dataset
+dataset_response = requests.post(
+    f"{BASE_URL}/datasets",
+    headers=headers,
+    json={
+        "name": "My First Dataset",
+        "description": "Testing FLTR",
+        "is_public": False
+    }
+)
+dataset_id = dataset_response.json()["id"]
+
+# Upload document
+doc_response = requests.post(
+    f"{BASE_URL}/datasets/{dataset_id}/documents",
+    headers=headers,
+    json={
+        "content": "FLTR is a powerful semantic search platform...",
+        "metadata": {"title": "About FLTR"}
+    }
+)
+
+# Query
+query_response = requests.post(
+    f"{BASE_URL}/mcp/query",
+    headers=headers,
+    json={
+        "query": "What is FLTR?",
+        "dataset_id": dataset_id,
+        "limit": 5
+    }
+)
+
+print(query_response.json())
+```
+
+```javascript JavaScript
+const API_KEY = "your_api_key_here";
+const BASE_URL = "https://api.fltr.com/v1";
+
+const headers = {
+  "Authorization": `Bearer ${API_KEY}`,
+  "Content-Type": "application/json"
+};
+
+// Create dataset
+const datasetResponse = await fetch(`${BASE_URL}/datasets`, {
+  method: "POST",
+  headers,
+  body: JSON.stringify({
+    name: "My First Dataset",
+    description: "Testing FLTR",
+    is_public: false
+  })
+});
+const { id: datasetId } = await datasetResponse.json();
+
+// Upload document
+await fetch(`${BASE_URL}/datasets/${datasetId}/documents`, {
+  method: "POST",
+  headers,
+  body: JSON.stringify({
+    content: "FLTR is a powerful semantic search platform...",
+    metadata: { title: "About FLTR" }
+  })
+});
+
+// Query
+const queryResponse = await fetch(`${BASE_URL}/mcp/query`, {
+  method: "POST",
+  headers,
+  body: JSON.stringify({
+    query: "What is FLTR?",
+    dataset_id: datasetId,
+    limit: 5
+  })
+});
+
+const results = await queryResponse.json();
+console.log(results);
+```
+
+```bash cURL
+# Set your API key
+export FLTR_API_KEY="your_api_key_here"
+
+# Create dataset
+DATASET_ID=$(curl -s -X POST https://api.fltr.com/v1/datasets \
+  -H "Authorization: Bearer $FLTR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My First Dataset","is_public":false}' \
+  | jq -r '.id')
+
+# Upload document
+curl -X POST https://api.fltr.com/v1/datasets/$DATASET_ID/documents \
+  -H "Authorization: Bearer $FLTR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "FLTR is a powerful semantic search platform...",
+    "metadata": {"title": "About FLTR"}
+  }'
+
+# Query
+curl -X POST https://api.fltr.com/v1/mcp/query \
+  -H "Authorization: Bearer $FLTR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"query\":\"What is FLTR?\",\"dataset_id\":\"$DATASET_ID\",\"limit\":5}"
+```
+
+</CodeGroup>
+
+## Rate Limits
+
+FLTR has three authentication tiers with different rate limits:
+
+| Method | Rate Limit | Best For |
+|--------|------------|----------|
+| Anonymous | 50 requests/hour | Quick testing |
+| API Key | 1,000 requests/hour | Production services |
+| OAuth/MCP | 15,000 requests/hour | MCP clients |
+
+<Tip>
+Rate limits are per account, not per API key. If you need higher limits, [contact support](mailto:support@fltr.com).
+</Tip>
+
+## Common Errors
+
+### 401 Unauthorized
+
+```json
+{"error": "Invalid API key"}
+```
+
+**Solution**: Double-check your API key and ensure it's properly formatted in the Authorization header:
+```
+Authorization: Bearer YOUR_API_KEY
+```
+
+### 404 Dataset Not Found
+
+```json
+{"error": "Dataset not found"}
+```
+
+**Solution**: Verify the dataset ID exists and belongs to your account. List your datasets:
+```bash
+curl https://api.fltr.com/v1/datasets \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### 429 Rate Limit Exceeded
+
+```json
+{"error": "Rate limit exceeded", "retry_after": 3600}
+```
+
+**Solution**: Wait for the retry period (in seconds) or upgrade to OAuth authentication for higher limits.
+
+### 413 Payload Too Large
+
+```json
+{"error": "Document exceeds maximum size of 10MB"}
+```
+
+**Solution**: Split large documents into smaller chunks before uploading, or use our chunking API.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="First Integration" icon="puzzle-piece" href="/quickstart/first-integration">
+    Build a complete RAG application with FLTR
+  </Card>
+
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Explore all available endpoints
+  </Card>
+
+  <Card title="MCP Integration" icon="plug" href="/authentication/oauth">
+    Connect FLTR to Claude Desktop or VS Code
+  </Card>
+
+  <Card title="Low-Code Integrations" icon="wand-magic-sparkles" href="/integrations/zapier">
+    Use FLTR with Zapier, Make, or n8n
+  </Card>
+</CardGroup>
+
+## Need Help?
+
+- **Documentation**: Browse our comprehensive [API reference](/api-reference/introduction)
+- **Examples**: Check out [integration examples](/integrations/zapier)
+- **Support**: Email us at [support@fltr.com](mailto:support@fltr.com)
+- **Status**: Monitor uptime at [status.fltr.com](https://status.fltr.com)

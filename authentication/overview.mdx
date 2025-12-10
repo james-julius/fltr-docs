@@ -1,0 +1,356 @@
+---
+title: 'Authentication Overview'
+description: 'Choose the right authentication method for your use case'
+---
+
+# Authentication Overview
+
+FLTR provides three authentication methods designed for different use cases. Choose the method that best fits your application's needs.
+
+## Authentication Methods
+
+<CardGroup cols={3}>
+  <Card title="API Keys" icon="key" href="/authentication/api-keys">
+    For scripts, services, and integrations
+
+    **Rate Limit**: 1,000 req/hour
+  </Card>
+
+  <Card title="OAuth 2.1" icon="shield-halved" href="/authentication/oauth">
+    For MCP clients and web apps
+
+    **Rate Limit**: 15,000 req/hour
+  </Card>
+
+  <Card title="Session Tokens" icon="browser" href="/authentication/sessions">
+    For web applications
+
+    **Rate Limit**: 15,000 req/hour
+  </Card>
+</CardGroup>
+
+## Comparison
+
+| Feature | Anonymous | API Key | OAuth/Session |
+|---------|-----------|---------|---------------|
+| **Rate Limit** | 50/hour | 1,000/hour | 15,000/hour |
+| **Setup Difficulty** | None | Easy | Moderate |
+| **Best For** | Testing | Production services | MCP clients, web apps |
+| **Revocable** | N/A | ✅ Yes | ✅ Yes |
+| **Scope Control** | ❌ No | ❌ No | ✅ Yes |
+| **Secure** | ⚠️ Limited | ✅ Yes | ✅ Yes (PKCE) |
+
+## When to Use Each Method
+
+### Anonymous Access
+
+**Use when:**
+- Testing the API without an account
+- Public datasets only
+- Prototyping or demos
+
+**Limitations:**
+- 50 requests per hour
+- Read-only access to public datasets
+- No document uploads
+- No dataset creation
+
+**Example:**
+```bash
+curl https://api.fltr.com/v1/datasets/public-dataset-id/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "search term"}'
+```
+
+### API Keys
+
+**Use when:**
+- Building backend services
+- Running scheduled jobs or cron tasks
+- Integrating with no-code platforms (Zapier, Make, n8n)
+- Deploying production applications
+
+**Benefits:**
+- Simple to implement
+- 1,000 requests per hour
+- Full access to your account's resources
+- Can be rotated and revoked
+
+**Example:**
+```bash
+curl https://api.fltr.com/v1/datasets \
+  -H "Authorization: Bearer fltr_sk_abc123..."
+```
+
+<Card title="API Keys Guide" icon="arrow-right" href="/authentication/api-keys">
+  Learn how to generate and manage API keys →
+</Card>
+
+### OAuth 2.1
+
+**Use when:**
+- Building MCP integrations (Claude Desktop, VS Code, Cursor)
+- Creating web applications with user authentication
+- Need fine-grained permission scopes
+- Require the highest rate limits
+
+**Benefits:**
+- 15,000 requests per hour
+- PKCE flow for enhanced security
+- Scope-based permissions
+- Automatic token refresh
+
+**Example:**
+```python
+# OAuth flow handles authentication
+# Your app receives an access token
+headers = {
+    "Authorization": f"Bearer {access_token}"
+}
+```
+
+<Card title="OAuth Guide" icon="arrow-right" href="/authentication/oauth">
+  Set up OAuth 2.1 with PKCE →
+</Card>
+
+### Session Tokens
+
+**Use when:**
+- Building single-page applications (SPAs)
+- Creating admin dashboards
+- Need browser-based authentication
+
+**Benefits:**
+- 15,000 requests per hour
+- HTTP-only cookies for security
+- CSRF protection built-in
+- Automatic session management
+
+**Example:**
+```javascript
+// After login, session cookie is set automatically
+fetch('https://api.fltr.com/v1/datasets', {
+  credentials: 'include'  // Sends session cookie
+})
+```
+
+<Card title="Sessions Guide" icon="arrow-right" href="/authentication/sessions">
+  Implement session-based auth →
+</Card>
+
+## Rate Limits
+
+All authentication methods have hourly rate limits:
+
+```
+Anonymous:    50 requests/hour
+API Key:      1,000 requests/hour
+OAuth/Session: 15,000 requests/hour
+```
+
+Rate limits are enforced per account, not per key. Multiple API keys share the same 1,000 req/hour limit.
+
+<Tip>
+Need higher limits? OAuth and session-based authentication provide 15x more capacity than API keys.
+</Tip>
+
+### Rate Limit Headers
+
+FLTR includes rate limit information in response headers:
+
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 847
+X-RateLimit-Reset: 1704657600
+```
+
+## Security Best Practices
+
+### For API Keys
+
+<Warning>
+API keys grant full access to your account. Treat them like passwords.
+</Warning>
+
+**Do:**
+- ✅ Store keys in environment variables
+- ✅ Use different keys for dev/staging/prod
+- ✅ Rotate keys periodically (every 90 days)
+- ✅ Revoke compromised keys immediately
+- ✅ Use server-side code only
+
+**Don't:**
+- ❌ Commit keys to version control
+- ❌ Embed keys in client-side JavaScript
+- ❌ Share keys via email or chat
+- ❌ Use the same key across multiple projects
+
+### For OAuth
+
+**Do:**
+- ✅ Always use PKCE flow
+- ✅ Validate redirect URIs
+- ✅ Store tokens securely (encrypted storage)
+- ✅ Use HTTPS for all OAuth flows
+- ✅ Implement token refresh logic
+
+**Don't:**
+- ❌ Store tokens in localStorage (use httpOnly cookies)
+- ❌ Skip state parameter validation
+- ❌ Use implicit flow (deprecated)
+
+### For Sessions
+
+**Do:**
+- ✅ Enable HTTP-only cookies
+- ✅ Use SameSite=Strict or Lax
+- ✅ Implement CSRF protection
+- ✅ Set secure flag in production
+- ✅ Use short session lifetimes
+
+**Don't:**
+- ❌ Store sensitive data in cookies
+- ❌ Accept credentials over HTTP
+- ❌ Skip CSRF validation
+
+## Authentication Errors
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Invalid API key",
+  "code": "invalid_api_key"
+}
+```
+
+**Causes:**
+- Invalid or expired API key
+- Missing Authorization header
+- Malformed Bearer token
+
+**Solution:**
+```bash
+# Correct format
+Authorization: Bearer fltr_sk_abc123...
+
+# Not this
+Authorization: fltr_sk_abc123...
+Authorization: Bearer: fltr_sk_abc123...
+```
+
+### 403 Forbidden
+
+```json
+{
+  "error": "Insufficient permissions",
+  "code": "insufficient_scope"
+}
+```
+
+**Causes:**
+- OAuth scope doesn't include required permission
+- Trying to access another user's resources
+- Account suspended
+
+### 429 Too Many Requests
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "retry_after": 3600,
+  "code": "rate_limit_exceeded"
+}
+```
+
+**Solution:**
+- Wait for `retry_after` seconds
+- Implement exponential backoff
+- Upgrade to OAuth for higher limits
+- Cache frequent queries
+
+## Migration Guide
+
+### From Anonymous → API Key
+
+1. Create account at [app.fltr.com](https://app.fltr.com)
+2. Generate API key in Settings → API Keys
+3. Add Authorization header to all requests:
+
+```diff
+  curl https://api.fltr.com/v1/datasets/ds_123/query \
++   -H "Authorization: Bearer fltr_sk_abc123..." \
+    -H "Content-Type: application/json" \
+    -d '{"query": "search term"}'
+```
+
+### From API Key → OAuth
+
+1. Register OAuth application in dashboard
+2. Implement PKCE authorization flow
+3. Exchange authorization code for access token
+4. Replace API key with access token:
+
+```diff
+  headers = {
+-   "Authorization": "Bearer fltr_sk_abc123..."
++   "Authorization": f"Bearer {access_token}"
+  }
+```
+
+<Card title="OAuth Implementation Guide" icon="code" href="/authentication/oauth">
+  Complete OAuth setup instructions →
+</Card>
+
+## Quick Reference
+
+### API Key Format
+
+```
+fltr_sk_abc123def456ghi789...
+       │  └─────────────────── Random identifier
+       └────────────────────── Secret key prefix
+```
+
+### OAuth Scopes
+
+```
+datasets:read     Read datasets and documents
+datasets:write    Create and modify datasets
+datasets:delete   Delete datasets and documents
+mcp:query        Use MCP query endpoints
+webhooks:manage   Create and manage webhooks
+```
+
+### HTTP Status Codes
+
+```
+200 OK              Request successful
+201 Created         Resource created successfully
+400 Bad Request     Invalid request parameters
+401 Unauthorized    Invalid or missing authentication
+403 Forbidden       Insufficient permissions
+404 Not Found       Resource doesn't exist
+429 Too Many Reqs   Rate limit exceeded
+500 Server Error    Internal server error
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Generate API Key" icon="key" href="/authentication/api-keys">
+    Create your first API key
+  </Card>
+
+  <Card title="Setup OAuth" icon="shield" href="/authentication/oauth">
+    Integrate with MCP clients
+  </Card>
+
+  <Card title="Rate Limits" icon="gauge" href="/support/rate-limits">
+    Understand rate limiting
+  </Card>
+
+  <Card title="Security Best Practices" icon="lock" href="/support/security">
+    Protect your integration
+  </Card>
+</CardGroup>

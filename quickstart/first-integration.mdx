@@ -1,0 +1,633 @@
+---
+title: 'Your First Integration'
+description: 'Build a complete RAG application with FLTR in 15 minutes'
+---
+
+# Build Your First RAG Application
+
+This tutorial walks you through building a complete Retrieval Augmented Generation (RAG) application using FLTR for semantic search and OpenAI for generation.
+
+## What You'll Build
+
+A document Q&A system that:
+1. Indexes a knowledge base using FLTR
+2. Retrieves relevant context for user questions
+3. Generates answers using GPT-4 with the retrieved context
+
+## Prerequisites
+
+- FLTR API key ([get one here](https://app.fltr.com/settings/api-keys))
+- OpenAI API key ([get one here](https://platform.openai.com/api-keys))
+- Python 3.8+ or Node.js 16+
+
+## Architecture Overview
+
+```
+User Question → FLTR Semantic Search → Retrieved Context → GPT-4 → Answer
+```
+
+The flow:
+1. User asks a question
+2. FLTR finds relevant chunks from your documents
+3. Chunks are passed as context to GPT-4
+4. GPT-4 generates an answer based on the context
+
+## Implementation
+
+<CodeGroup>
+
+```python Python
+import os
+import requests
+from openai import OpenAI
+
+# Configuration
+FLTR_API_KEY = os.getenv("FLTR_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+FLTR_BASE_URL = "https://api.fltr.com/v1"
+
+fltr_headers = {
+    "Authorization": f"Bearer {FLTR_API_KEY}",
+    "Content-Type": "application/json"
+}
+
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
+
+# Step 1: Create a dataset
+def create_dataset(name: str, description: str):
+    response = requests.post(
+        f"{FLTR_BASE_URL}/datasets",
+        headers=fltr_headers,
+        json={
+            "name": name,
+            "description": description,
+            "is_public": False
+        }
+    )
+    response.raise_for_status()
+    return response.json()["id"]
+
+# Step 2: Upload documents
+def upload_document(dataset_id: str, content: str, metadata: dict):
+    response = requests.post(
+        f"{FLTR_BASE_URL}/datasets/{dataset_id}/documents",
+        headers=fltr_headers,
+        json={
+            "content": content,
+            "metadata": metadata
+        }
+    )
+    response.raise_for_status()
+    return response.json()
+
+# Step 3: Query FLTR for relevant context
+def search_knowledge_base(dataset_id: str, query: str, limit: int = 3):
+    response = requests.post(
+        f"{FLTR_BASE_URL}/mcp/query",
+        headers=fltr_headers,
+        json={
+            "query": query,
+            "dataset_id": dataset_id,
+            "limit": limit
+        }
+    )
+    response.raise_for_status()
+    return response.json()["results"]
+
+# Step 4: Generate answer with GPT-4
+def generate_answer(question: str, context_chunks: list):
+    # Format context from retrieved chunks
+    context = "\n\n".join([
+        f"[Source: {chunk['metadata'].get('title', 'Unknown')}]\n{chunk['content']}"
+        for chunk in context_chunks
+    ])
+
+    # Create prompt with context
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a helpful assistant. Answer questions based on the provided context. If the context doesn't contain enough information, say so."
+        },
+        {
+            "role": "user",
+            "content": f"Context:\n{context}\n\nQuestion: {question}"
+        }
+    ]
+
+    # Call GPT-4
+    response = openai_client.chat.completions.create(
+        model="gpt-4",
+        messages=messages,
+        temperature=0.7,
+        max_tokens=500
+    )
+
+    return response.choices[0].message.content
+
+# Step 5: Main RAG function
+def answer_question(dataset_id: str, question: str):
+    print(f"Question: {question}\n")
+
+    # Retrieve relevant context
+    print("Searching knowledge base...")
+    chunks = search_knowledge_base(dataset_id, question, limit=3)
+
+    print(f"Found {len(chunks)} relevant chunks\n")
+
+    # Generate answer
+    print("Generating answer...")
+    answer = generate_answer(question, chunks)
+
+    print(f"\nAnswer: {answer}\n")
+
+    # Show sources
+    print("Sources:")
+    for i, chunk in enumerate(chunks, 1):
+        title = chunk['metadata'].get('title', 'Unknown')
+        score = chunk['score']
+        print(f"{i}. {title} (relevance: {score:.2f})")
+
+    return answer
+
+# Example usage
+if __name__ == "__main__":
+    # Create dataset
+    dataset_id = create_dataset(
+        name="Product Documentation",
+        description="FLTR product docs for RAG demo"
+    )
+
+    print(f"Created dataset: {dataset_id}\n")
+
+    # Upload sample documents
+    docs = [
+        {
+            "content": "FLTR supports three authentication methods: API keys for services, OAuth 2.1 for MCP clients, and session tokens for web apps. API keys provide 1,000 requests per hour.",
+            "metadata": {"title": "Authentication Guide", "category": "security"}
+        },
+        {
+            "content": "FLTR uses hybrid search combining vector embeddings with keyword matching. You can enable Cohere reranking for even better results. The default embedding model is text-embedding-3-small.",
+            "metadata": {"title": "Search Guide", "category": "features"}
+        },
+        {
+            "content": "To integrate FLTR with Zapier, use the Webhooks by Zapier action. Set the URL to https://api.fltr.com/v1/mcp/query and include your API key in the Authorization header.",
+            "metadata": {"title": "Zapier Integration", "category": "integrations"}
+        }
+    ]
+
+    for doc in docs:
+        upload_document(dataset_id, doc["content"], doc["metadata"])
+        print(f"Uploaded: {doc['metadata']['title']}")
+
+    print("\nWaiting for indexing to complete...\n")
+    import time
+    time.sleep(3)  # Give FLTR time to process
+
+    # Ask questions
+    questions = [
+        "How do I authenticate with FLTR?",
+        "What search methods does FLTR support?",
+        "How can I use FLTR with Zapier?"
+    ]
+
+    for question in questions:
+        print("=" * 60)
+        answer_question(dataset_id, question)
+        print()
+```
+
+```javascript JavaScript
+import OpenAI from "openai";
+
+// Configuration
+const FLTR_API_KEY = process.env.FLTR_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const FLTR_BASE_URL = "https://api.fltr.com/v1";
+
+const fltrHeaders = {
+  "Authorization": `Bearer ${FLTR_API_KEY}`,
+  "Content-Type": "application/json"
+};
+
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+
+// Step 1: Create a dataset
+async function createDataset(name, description) {
+  const response = await fetch(`${FLTR_BASE_URL}/datasets`, {
+    method: "POST",
+    headers: fltrHeaders,
+    body: JSON.stringify({
+      name,
+      description,
+      is_public: false
+    })
+  });
+
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  return data.id;
+}
+
+// Step 2: Upload documents
+async function uploadDocument(datasetId, content, metadata) {
+  const response = await fetch(
+    `${FLTR_BASE_URL}/datasets/${datasetId}/documents`,
+    {
+      method: "POST",
+      headers: fltrHeaders,
+      body: JSON.stringify({ content, metadata })
+    }
+  );
+
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return await response.json();
+}
+
+// Step 3: Query FLTR for relevant context
+async function searchKnowledgeBase(datasetId, query, limit = 3) {
+  const response = await fetch(`${FLTR_BASE_URL}/mcp/query`, {
+    method: "POST",
+    headers: fltrHeaders,
+    body: JSON.stringify({
+      query,
+      dataset_id: datasetId,
+      limit
+    })
+  });
+
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  return data.results;
+}
+
+// Step 4: Generate answer with GPT-4
+async function generateAnswer(question, contextChunks) {
+  // Format context from retrieved chunks
+  const context = contextChunks
+    .map(chunk =>
+      `[Source: ${chunk.metadata?.title || "Unknown"}]\n${chunk.content}`
+    )
+    .join("\n\n");
+
+  // Create prompt with context
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [
+      {
+        role: "system",
+        content: "You are a helpful assistant. Answer questions based on the provided context. If the context doesn't contain enough information, say so."
+      },
+      {
+        role: "user",
+        content: `Context:\n${context}\n\nQuestion: ${question}`
+      }
+    ],
+    temperature: 0.7,
+    max_tokens: 500
+  });
+
+  return completion.choices[0].message.content;
+}
+
+// Step 5: Main RAG function
+async function answerQuestion(datasetId, question) {
+  console.log(`Question: ${question}\n`);
+
+  // Retrieve relevant context
+  console.log("Searching knowledge base...");
+  const chunks = await searchKnowledgeBase(datasetId, question, 3);
+
+  console.log(`Found ${chunks.length} relevant chunks\n`);
+
+  // Generate answer
+  console.log("Generating answer...");
+  const answer = await generateAnswer(question, chunks);
+
+  console.log(`\nAnswer: ${answer}\n`);
+
+  // Show sources
+  console.log("Sources:");
+  chunks.forEach((chunk, i) => {
+    const title = chunk.metadata?.title || "Unknown";
+    const score = chunk.score;
+    console.log(`${i + 1}. ${title} (relevance: ${score.toFixed(2)})`);
+  });
+
+  return answer;
+}
+
+// Example usage
+async function main() {
+  // Create dataset
+  const datasetId = await createDataset(
+    "Product Documentation",
+    "FLTR product docs for RAG demo"
+  );
+
+  console.log(`Created dataset: ${datasetId}\n`);
+
+  // Upload sample documents
+  const docs = [
+    {
+      content: "FLTR supports three authentication methods: API keys for services, OAuth 2.1 for MCP clients, and session tokens for web apps. API keys provide 1,000 requests per hour.",
+      metadata: { title: "Authentication Guide", category: "security" }
+    },
+    {
+      content: "FLTR uses hybrid search combining vector embeddings with keyword matching. You can enable Cohere reranking for even better results. The default embedding model is text-embedding-3-small.",
+      metadata: { title: "Search Guide", category: "features" }
+    },
+    {
+      content: "To integrate FLTR with Zapier, use the Webhooks by Zapier action. Set the URL to https://api.fltr.com/v1/mcp/query and include your API key in the Authorization header.",
+      metadata: { title: "Zapier Integration", category: "integrations" }
+    }
+  ];
+
+  for (const doc of docs) {
+    await uploadDocument(datasetId, doc.content, doc.metadata);
+    console.log(`Uploaded: ${doc.metadata.title}`);
+  }
+
+  console.log("\nWaiting for indexing to complete...\n");
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
+  // Ask questions
+  const questions = [
+    "How do I authenticate with FLTR?",
+    "What search methods does FLTR support?",
+    "How can I use FLTR with Zapier?"
+  ];
+
+  for (const question of questions) {
+    console.log("=".repeat(60));
+    await answerQuestion(datasetId, question);
+    console.log();
+  }
+}
+
+main().catch(console.error);
+```
+
+</CodeGroup>
+
+## Running the Example
+
+<Steps>
+  <Step title="Install Dependencies">
+    <CodeGroup>
+    ```bash Python
+    pip install requests openai
+    ```
+
+    ```bash JavaScript
+    npm install openai
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Set Environment Variables">
+    ```bash
+    export FLTR_API_KEY="your_fltr_api_key"
+    export OPENAI_API_KEY="your_openai_api_key"
+    ```
+  </Step>
+
+  <Step title="Run the Script">
+    <CodeGroup>
+    ```bash Python
+    python rag_demo.py
+    ```
+
+    ```bash JavaScript
+    node rag_demo.js
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## Expected Output
+
+```
+Created dataset: ds_abc123
+
+Uploaded: Authentication Guide
+Uploaded: Search Guide
+Uploaded: Zapier Integration
+
+Waiting for indexing to complete...
+
+============================================================
+Question: How do I authenticate with FLTR?
+
+Searching knowledge base...
+Found 3 relevant chunks
+
+Generating answer...
+
+Answer: FLTR supports three authentication methods:
+
+1. **API Keys** - Best for services and scripts, providing 1,000 requests per hour
+2. **OAuth 2.1** - Designed for MCP clients with higher rate limits
+3. **Session Tokens** - For web applications
+
+For most integrations, API keys are the recommended approach. You can generate them in your FLTR dashboard under Settings → API Keys.
+
+Sources:
+1. Authentication Guide (relevance: 0.92)
+2. Zapier Integration (relevance: 0.45)
+3. Search Guide (relevance: 0.31)
+```
+
+## Advanced Features
+
+### Enable Reranking
+
+For better result quality, enable Cohere reranking:
+
+```python
+def search_knowledge_base(dataset_id: str, query: str, limit: int = 3):
+    response = requests.post(
+        f"{FLTR_BASE_URL}/mcp/query",
+        headers=fltr_headers,
+        json={
+            "query": query,
+            "dataset_id": dataset_id,
+            "limit": limit,
+            "rerank": True  # Enable Cohere reranking
+        }
+    )
+    response.raise_for_status()
+    return response.json()["results"]
+```
+
+### Batch Queries
+
+Process multiple questions efficiently:
+
+```python
+def batch_search(dataset_id: str, queries: list):
+    response = requests.post(
+        f"{FLTR_BASE_URL}/mcp/batch-query",
+        headers=fltr_headers,
+        json={
+            "queries": queries,
+            "dataset_id": dataset_id,
+            "limit": 3
+        }
+    )
+    response.raise_for_status()
+    return response.json()["results"]
+```
+
+### Add Citations
+
+Include source references in generated answers:
+
+```python
+def generate_answer_with_citations(question: str, context_chunks: list):
+    # Add numbered citations to context
+    context_parts = []
+    for i, chunk in enumerate(context_chunks, 1):
+        title = chunk['metadata'].get('title', 'Unknown')
+        context_parts.append(f"[{i}] {title}:\n{chunk['content']}")
+
+    context = "\n\n".join(context_parts)
+
+    messages = [
+        {
+            "role": "system",
+            "content": "Answer questions using the provided context. Include citation numbers [1], [2], etc. when referencing sources."
+        },
+        {
+            "role": "user",
+            "content": f"Context:\n{context}\n\nQuestion: {question}"
+        }
+    ]
+
+    response = openai_client.chat.completions.create(
+        model="gpt-4",
+        messages=messages,
+        temperature=0.7
+    )
+
+    return response.choices[0].message.content
+```
+
+## Production Considerations
+
+### Error Handling
+
+```python
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10)
+)
+def search_with_retry(dataset_id: str, query: str):
+    try:
+        return search_knowledge_base(dataset_id, query)
+    except requests.exceptions.RequestException as e:
+        print(f"Search failed: {e}")
+        raise
+```
+
+### Caching
+
+Cache frequent queries to reduce API calls:
+
+```python
+from functools import lru_cache
+import hashlib
+
+@lru_cache(maxsize=100)
+def cached_search(dataset_id: str, query: str):
+    # Cache key includes dataset and query
+    return search_knowledge_base(dataset_id, query)
+```
+
+### Monitoring
+
+Track performance and costs:
+
+```python
+import time
+from datetime import datetime
+
+def answer_question_with_metrics(dataset_id: str, question: str):
+    start_time = time.time()
+
+    # Track costs (approximate)
+    fltr_cost = 0.0001  # Per query
+    gpt4_cost = 0.03    # Per 1K tokens (approximate)
+
+    chunks = search_knowledge_base(dataset_id, question)
+    search_time = time.time() - start_time
+
+    answer = generate_answer(question, chunks)
+    total_time = time.time() - start_time
+
+    # Log metrics
+    print(f"""
+    Metrics:
+    - Search time: {search_time:.2f}s
+    - Total time: {total_time:.2f}s
+    - Chunks retrieved: {len(chunks)}
+    - Estimated cost: ${fltr_cost + gpt4_cost:.4f}
+    - Timestamp: {datetime.now().isoformat()}
+    """)
+
+    return answer
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api-reference/mcp/query">
+    Explore advanced query options
+  </Card>
+
+  <Card title="Zapier Integration" icon="bolt" href="/integrations/zapier">
+    Build no-code RAG workflows
+  </Card>
+
+  <Card title="OAuth Setup" icon="shield" href="/authentication/oauth">
+    Integrate with Claude Desktop
+  </Card>
+
+  <Card title="Webhooks" icon="webhook" href="/api-reference/webhooks/overview">
+    Get notified of document updates
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### No Results Returned
+
+If queries return zero results:
+1. Wait 5-10 seconds after uploading for indexing to complete
+2. Try broader search terms
+3. Check that documents were uploaded successfully
+4. Verify the dataset ID is correct
+
+### Low Relevance Scores
+
+To improve search quality:
+1. Enable reranking with `"rerank": true`
+2. Add descriptive metadata to documents
+3. Break large documents into smaller chunks
+4. Use more specific queries
+
+### Rate Limit Issues
+
+If you hit rate limits:
+1. Implement exponential backoff and retry logic
+2. Cache frequent queries
+3. Use batch queries for multiple questions
+4. Upgrade to OAuth for 15,000 req/hour
+
+## Resources
+
+- [FLTR Python SDK](https://github.com/fltr/fltr-python) (coming soon)
+- [FLTR JavaScript SDK](https://github.com/fltr/fltr-js) (coming soon)
+- [OpenAI Cookbook](https://github.com/openai/openai-cookbook)
+- [RAG Best Practices](https://docs.fltr.com/guides/rag-best-practices)
