@@ -46,7 +46,7 @@ Session authentication provides:
     Send users to the FLTR login page:
 
     ```javascript
-    window.location.href = 'https://app.fltr.com/login?redirect_uri=' +
+    window.location.href = 'https://www.tryfltr.com/login?redirect_uri=' +
       encodeURIComponent(window.location.href);
     ```
   </Step>
@@ -106,7 +106,7 @@ function App() {
   // Login redirect
   function login() {
     const redirectUri = encodeURIComponent(window.location.href);
-    window.location.href = `https://app.fltr.com/login?redirect_uri=${redirectUri}`;
+    window.location.href = `https://www.tryfltr.com/login?redirect_uri=${redirectUri}`;
   }
 
   // Logout
@@ -196,7 +196,7 @@ app.get('/auth/callback', async (req, res) => {
   const { code } = req.query;
 
   // Exchange code for access token (OAuth flow)
-  const tokenResponse = await fetch('https://app.fltr.com/oauth/token', {
+  const tokenResponse = await fetch('https://www.tryfltr.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -579,7 +579,7 @@ async function loadDatasets() {
 
 function login() {
   const redirectUri = encodeURIComponent(window.location.href);
-  window.location.href = `https://app.fltr.com/login?redirect_uri=${redirectUri}`;
+  window.location.href = `https://www.tryfltr.com/login?redirect_uri=${redirectUri}`;
 }
 
 async function logout() {

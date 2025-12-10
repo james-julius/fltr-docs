@@ -101,7 +101,7 @@
       "anchors": [
         {
           "anchor": "Dashboard",
-          "href": "https://app.fltr.com",
+          "href": "https://www.tryfltr.com",
           "icon": "chart-line"
         },
         {
@@ -115,7 +115,7 @@
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg",
-    "href": "https://app.fltr.com"
+    "href": "https://www.tryfltr.com"
   },
   "navbar": {
     "links": [
@@ -127,7 +127,7 @@
     "primary": {
       "type": "button",
       "label": "Dashboard",
-      "href": "https://app.fltr.com"
+      "href": "https://www.tryfltr.com"
     }
   },
   "contextual": {

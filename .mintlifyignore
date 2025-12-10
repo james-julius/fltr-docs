@@ -1,0 +1,13 @@
+# Planning and architecture documents
+PARALLEL_PROCESSING_IMPLEMENTATION.md
+PHASE_3_MULTIMODAL_IMPLEMENTATION.md
+batch-processing-plan.md
+architecture/
+archive/
+deprecated/
+node_modules/
+
+# Development files
+.git/
+.DS_Store
+*.log
