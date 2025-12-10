@@ -1,0 +1,217 @@
+---
+title: 'Query Dataset'
+api: 'POST https://api.fltr.com/v1/mcp/query'
+description: 'Semantic search over a dataset using hybrid vector + keyword search'
+---
+
+## Request
+
+Performs semantic search combining vector similarity and keyword matching.
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Body
+
+<ParamField body="query" type="string" required>
+  Search query or question (max 1000 characters)
+</ParamField>
+
+<ParamField body="dataset_id" type="string" required>
+  Dataset to search
+</ParamField>
+
+<ParamField body="limit" type="integer" default={5}>
+  Number of results to return (max: 50)
+</ParamField>
+
+<ParamField body="rerank" type="boolean" default={false}>
+  Enable Cohere reranking for better quality
+</ParamField>
+
+<ParamField body="filters" type="object">
+  Filter by metadata fields
+</ParamField>
+
+## Response
+
+<ResponseField name="results" type="array">
+  Array of search results
+</ResponseField>
+
+<ResponseField name="results[].chunk_id" type="string">
+  Unique chunk identifier
+</ResponseField>
+
+<ResponseField name="results[].content" type="string">
+  Text content of the chunk
+</ResponseField>
+
+<ResponseField name="results[].score" type="number">
+  Relevance score (0-1, higher is better)
+</ResponseField>
+
+<ResponseField name="results[].metadata" type="object">
+  Document metadata
+</ResponseField>
+
+<ResponseField name="results[].document_id" type="string">
+  Parent document ID
+</ResponseField>
+
+<ResponseField name="query_time_ms" type="integer">
+  Query execution time in milliseconds
+</ResponseField>
+
+## Examples
+
+### Basic Query
+
+```bash cURL
+curl -X POST https://api.fltr.com/v1/mcp/query \
+  -H "Authorization: Bearer fltr_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I authenticate with FLTR?",
+    "dataset_id": "ds_abc123",
+    "limit": 3
+  }'
+```
+
+```python Python
+response = requests.post(
+    "https://api.fltr.com/v1/mcp/query",
+    headers={
+        "Authorization": "Bearer fltr_sk_abc123...",
+        "Content-Type": "application/json"
+    },
+    json={
+        "query": "How do I authenticate with FLTR?",
+        "dataset_id": "ds_abc123",
+        "limit": 3
+    }
+)
+
+results = response.json()
+for result in results['results']:
+    print(f"[{result['score']:.2f}] {result['metadata']['title']}")
+    print(result['content'][:200])
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.fltr.com/v1/mcp/query", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer fltr_sk_abc123...",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    query: "How do I authenticate with FLTR?",
+    dataset_id: "ds_abc123",
+    limit: 3
+  })
+});
+
+const data = await response.json();
+data.results.forEach(result => {
+  console.log(`[${result.score}] ${result.metadata.title}`);
+});
+```
+
+### With Reranking
+
+```json
+{
+  "query": "authentication methods",
+  "dataset_id": "ds_abc123",
+  "limit": 10,
+  "rerank": true
+}
+```
+
+### With Filters
+
+```json
+{
+  "query": "API documentation",
+  "dataset_id": "ds_abc123",
+  "limit": 5,
+  "filters": {
+    "category": "tutorial",
+    "published": true
+  }
+}
+```
+
+### Response
+
+```json
+{
+  "results": [
+    {
+      "chunk_id": "ch_xyz789",
+      "content": "FLTR supports three authentication methods: API keys for services, OAuth 2.1 for MCP clients, and session tokens for web apps...",
+      "score": 0.89,
+      "metadata": {
+        "title": "Authentication Guide",
+        "category": "security",
+        "url": "https://docs.fltr.com/auth"
+      },
+      "document_id": "doc_abc123"
+    },
+    {
+      "chunk_id": "ch_abc456",
+      "content": "To authenticate API requests, include your API key in the Authorization header: Bearer fltr_sk_...",
+      "score": 0.82,
+      "metadata": {
+        "title": "API Keys",
+        "category": "security"
+      },
+      "document_id": "doc_def456"
+    }
+  ],
+  "query_time_ms": 45
+}
+```
+
+## Search Algorithm
+
+FLTR uses hybrid search combining:
+
+1. **Vector Search** - Semantic similarity using embeddings
+2. **Keyword Search** - BM25 for exact matches
+3. **Fusion** - RRF (Reciprocal Rank Fusion) to combine results
+
+Optional Cohere reranking provides additional quality improvement.
+
+## Scoring
+
+Scores range from 0 to 1:
+
+- **0.9-1.0** - Excellent match
+- **0.7-0.9** - Good match
+- **0.5-0.7** - Moderate match  
+- **<0.5** - Weak match
+
+## Performance
+
+- **Average latency**: 50-200ms
+- **With reranking**: +100-300ms
+- **Timeout**: 10 seconds
+
+## Limits
+
+- Max query length: 1,000 characters
+- Max results: 50 per request
+- Filters: 10 fields maximum
+
+## Tips
+
+- Use natural language questions
+- Include context in your query
+- Enable reranking for better quality
+- Filter by metadata to narrow results
+- Request 3-5 results for most use cases

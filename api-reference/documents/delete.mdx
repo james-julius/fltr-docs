@@ -1,0 +1,48 @@
+---
+title: 'Delete Document'
+api: 'DELETE https://api.fltr.com/v1/datasets/{dataset_id}/documents/{document_id}'
+description: 'Permanently delete a document'
+---
+
+## Request
+
+Deletes a document and all its chunks from the search index.
+
+### Path Parameters
+
+<ParamField path="dataset_id" type="string" required>
+  The parent dataset ID
+</ParamField>
+
+<ParamField path="document_id" type="string" required>
+  The document ID to delete
+</ParamField>
+
+## Response
+
+Returns `204 No Content` on successful deletion.
+
+## Examples
+
+```bash cURL
+curl -X DELETE https://api.fltr.com/v1/datasets/ds_abc123/documents/doc_xyz789 \
+  -H "Authorization: Bearer fltr_sk_abc123..."
+```
+
+```python Python
+response = requests.delete(
+    "https://api.fltr.com/v1/datasets/ds_abc123/documents/doc_xyz789",
+    headers={"Authorization": "Bearer fltr_sk_abc123..."}
+)
+```
+
+## Notes
+
+<Warning>
+Deletion is permanent and cannot be undone.
+</Warning>
+
+- All chunks removed from search index
+- Vector embeddings deleted
+- Metadata lost
+- Active search results may reference deleted document briefly

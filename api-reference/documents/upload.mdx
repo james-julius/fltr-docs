@@ -1,0 +1,183 @@
+---
+title: 'Upload Document'
+api: 'POST https://api.fltr.com/v1/datasets/{dataset_id}/documents'
+description: 'Upload a document or text content to a dataset'
+---
+
+## Request
+
+Uploads a document to a dataset. Supports text content, PDFs, images, and other file types.
+
+### Path Parameters
+
+<ParamField path="dataset_id" type="string" required>
+  The dataset to upload to
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Body (JSON Upload)
+
+For text content, use JSON:
+
+<ParamField body="content" type="string" required>
+  Text content to index
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Custom metadata (title, category, tags, etc.)
+</ParamField>
+
+### Body (File Upload)
+
+For files, use `multipart/form-data`:
+
+<ParamField body="file" type="file" required>
+  File to upload (PDF, image, text, etc.)
+</ParamField>
+
+<ParamField body="metadata" type="string">
+  JSON-encoded metadata object
+</ParamField>
+
+## Response
+
+<ResponseField name="document_id" type="string">
+  Unique document identifier
+</ResponseField>
+
+<ResponseField name="dataset_id" type="string">
+  Parent dataset ID
+</ResponseField>
+
+<ResponseField name="filename" type="string">
+  Original filename (for file uploads)
+</ResponseField>
+
+<ResponseField name="size_bytes" type="integer">
+  Document size in bytes
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Processing status: `processing`, `ready`, `failed`
+</ResponseField>
+
+<ResponseField name="chunks_created" type="integer">
+  Number of searchable chunks (available when `status: ready`)
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 creation timestamp
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Document metadata
+</ResponseField>
+
+## Examples
+
+### Text Upload
+
+```bash cURL
+curl -X POST https://api.fltr.com/v1/datasets/ds_abc123/documents \
+  -H "Authorization: Bearer fltr_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "FLTR is a semantic search platform...",
+    "metadata": {
+      "title": "About FLTR",
+      "category": "documentation",
+      "tags": ["intro", "overview"]
+    }
+  }'
+```
+
+```python Python
+response = requests.post(
+    "https://api.fltr.com/v1/datasets/ds_abc123/documents",
+    headers={
+        "Authorization": "Bearer fltr_sk_abc123...",
+        "Content-Type": "application/json"
+    },
+    json={
+        "content": "FLTR is a semantic search platform...",
+        "metadata": {
+            "title": "About FLTR",
+            "category": "documentation"
+        }
+    }
+)
+```
+
+### File Upload
+
+```bash cURL
+curl -X POST https://api.fltr.com/v1/datasets/ds_abc123/documents \
+  -H "Authorization: Bearer fltr_sk_abc123..." \
+  -F "file=@document.pdf" \
+  -F 'metadata={"title":"Product Guide","category":"docs"}'
+```
+
+```python Python
+with open('document.pdf', 'rb') as f:
+    response = requests.post(
+        "https://api.fltr.com/v1/datasets/ds_abc123/documents",
+        headers={"Authorization": "Bearer fltr_sk_abc123..."},
+        files={"file": f},
+        data={"metadata": '{"title":"Product Guide"}'}
+    )
+```
+
+### Response
+
+```json
+{
+  "document_id": "doc_xyz789",
+  "dataset_id": "ds_abc123",
+  "filename": "document.pdf",
+  "size_bytes": 1048576,
+  "status": "processing",
+  "created_at": "2024-01-10T12:00:00Z",
+  "metadata": {
+    "title": "Product Guide",
+    "category": "docs"
+  }
+}
+```
+
+## Processing
+
+Documents are processed asynchronously:
+
+1. **Upload** - File received and stored
+2. **Extraction** - Text extracted from file
+3. **Chunking** - Content split into searchable segments
+4. **Embedding** - Vector embeddings generated
+5. **Indexing** - Added to search index
+
+Processing typically takes 1-30 seconds depending on document size.
+
+## Supported File Types
+
+- **Text**: `.txt`, `.md`, `.csv`
+- **Documents**: `.pdf`, `.docx`, `.pptx`
+- **Images**: `.jpg`, `.png` (OCR applied)
+- **Code**: `.py`, `.js`, `.java`, etc.
+- **Data**: `.json`, `.xml`, `.yaml`
+
+## Limits
+
+- Max file size: 10MB
+- Max content length: 1M characters
+- Max 10,000 documents per dataset
+
+## Notes
+
+- Set `title` in metadata for better search results
+- Use `category` and `tags` for filtering
+- Custom metadata is searchable
+- Duplicate content is allowed

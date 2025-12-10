@@ -1,0 +1,33 @@
+---
+title: 'MCP Dataset List'
+api: 'GET https://api.fltr.com/v1/mcp/datasets'
+description: 'List datasets accessible via MCP'
+---
+
+## Request
+
+Returns datasets available for MCP querying.
+
+## Response
+
+```json
+{
+  "datasets": [
+    {
+      "id": "ds_abc123",
+      "name": "Product Documentation",
+      "description": "All product docs",
+      "document_count": 42
+    }
+  ]
+}
+```
+
+## Examples
+
+```bash cURL
+curl https://api.fltr.com/v1/mcp/datasets \
+  -H "Authorization: Bearer fltr_at_abc123..."
+```
+
+For MCP clients (Claude Desktop, VS Code), this endpoint is called automatically to show available datasets.

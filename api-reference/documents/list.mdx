@@ -1,0 +1,60 @@
+---
+title: 'List Documents'
+api: 'GET https://api.fltr.com/v1/datasets/{dataset_id}/documents'
+description: 'List all documents in a dataset'
+---
+
+## Request
+
+Returns a paginated list of documents in a dataset.
+
+### Path Parameters
+
+<ParamField path="dataset_id" type="string" required>
+  The dataset to list documents from
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="limit" type="integer" default={20}>
+  Number of documents to return (max: 100)
+</ParamField>
+
+<ParamField query="offset" type="integer" default={0}>
+  Number of documents to skip
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by status: `processing`, `ready`, `failed`
+</ParamField>
+
+## Examples
+
+```bash cURL
+curl https://api.fltr.com/v1/datasets/ds_abc123/documents?limit=10 \
+  -H "Authorization: Bearer fltr_sk_abc123..."
+```
+
+### Response
+
+```json
+{
+  "documents": [
+    {
+      "document_id": "doc_xyz789",
+      "dataset_id": "ds_abc123",
+      "filename": "guide.pdf",
+      "status": "ready",
+      "chunks_created": 47,
+      "created_at": "2024-01-10T12:00:00Z",
+      "metadata": {
+        "title": "Product Guide"
+      }
+    }
+  ],
+  "total": 1,
+  "limit": 10,
+  "offset": 0,
+  "has_more": false
+}
+```

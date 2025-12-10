@@ -1,0 +1,60 @@
+---
+title: 'Delete Dataset'
+api: 'DELETE https://api.fltr.com/v1/datasets/{dataset_id}'
+description: 'Permanently delete a dataset and all its documents'
+---
+
+## Request
+
+Deletes a dataset and all its documents. This action cannot be undone.
+
+### Path Parameters
+
+<ParamField path="dataset_id" type="string" required>
+  The unique dataset identifier to delete
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+## Response
+
+Returns `204 No Content` on successful deletion.
+
+## Examples
+
+```bash cURL
+curl -X DELETE https://api.fltr.com/v1/datasets/ds_abc123 \
+  -H "Authorization: Bearer fltr_sk_abc123..."
+```
+
+```python Python
+response = requests.delete(
+    "https://api.fltr.com/v1/datasets/ds_abc123",
+    headers={"Authorization": "Bearer fltr_sk_abc123..."}
+)
+# response.status_code == 204
+```
+
+## Errors
+
+```json
+{
+  "error": "Dataset not found",
+  "code": "dataset_not_found"
+}
+```
+
+## Notes
+
+<Warning>
+This permanently deletes the dataset and all documents within it. This action cannot be undone.
+</Warning>
+
+- All documents in the dataset will be deleted
+- Vector embeddings will be removed
+- Metadata will be lost
+- Active queries may fail

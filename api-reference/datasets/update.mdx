@@ -1,0 +1,70 @@
+---
+title: 'Update Dataset'
+api: 'PATCH https://api.fltr.com/v1/datasets/{dataset_id}'
+description: 'Update dataset name, description, or metadata'
+---
+
+## Request
+
+Updates dataset properties. Only provided fields will be updated.
+
+### Path Parameters
+
+<ParamField path="dataset_id" type="string" required>
+  The unique dataset identifier
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Body
+
+<ParamField body="name" type="string">
+  New dataset name (1-200 characters)
+</ParamField>
+
+<ParamField body="description" type="string">
+  New description (max 1000 characters)
+</ParamField>
+
+<ParamField body="is_public" type="boolean">
+  Update public accessibility
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Update metadata (merges with existing)
+</ParamField>
+
+## Examples
+
+```bash cURL
+curl -X PATCH https://api.fltr.com/v1/datasets/ds_abc123 \
+  -H "Authorization: Bearer fltr_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Updated Name", "description": "New description"}'
+```
+
+```python Python
+response = requests.patch(
+    "https://api.fltr.com/v1/datasets/ds_abc123",
+    headers={"Authorization": "Bearer fltr_sk_abc123..."},
+    json={"name": "Updated Name"}
+)
+```
+
+### Response
+
+```json
+{
+  "id": "ds_abc123",
+  "name": "Updated Name",
+  "description": "New description",
+  "is_public": false,
+  "document_count": 42,
+  "created_at": "2024-01-10T12:00:00Z",
+  "updated_at": "2024-01-10T16:00:00Z"
+}
+```

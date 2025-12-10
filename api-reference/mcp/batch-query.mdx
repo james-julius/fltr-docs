@@ -1,0 +1,103 @@
+---
+title: 'Batch Query'
+api: 'POST https://api.fltr.com/v1/mcp/batch-query'
+description: 'Search multiple queries in a single request'
+---
+
+## Request
+
+Executes multiple search queries in parallel for better performance.
+
+### Body
+
+<ParamField body="queries" type="array" required>
+  Array of search queries (max 10)
+</ParamField>
+
+<ParamField body="dataset_id" type="string" required>
+  Dataset to search
+</ParamField>
+
+<ParamField body="limit" type="integer" default={5}>
+  Results per query
+</ParamField>
+
+<ParamField body="rerank" type="boolean" default={false}>
+  Enable reranking for all queries
+</ParamField>
+
+## Examples
+
+```bash cURL
+curl -X POST https://api.fltr.com/v1/mcp/batch-query \
+  -H "Authorization: Bearer fltr_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "queries": [
+      "How do I authenticate?",
+      "What are rate limits?",
+      "How to upload documents?"
+    ],
+    "dataset_id": "ds_abc123",
+    "limit": 3
+  }'
+```
+
+```python Python
+response = requests.post(
+    "https://api.fltr.com/v1/mcp/batch-query",
+    headers={"Authorization": "Bearer fltr_sk_abc123..."},
+    json={
+        "queries": [
+            "How do I authenticate?",
+            "What are rate limits?",
+            "How to upload documents?"
+        ],
+        "dataset_id": "ds_abc123",
+        "limit": 3
+    }
+)
+
+data = response.json()
+for i, query_results in enumerate(data['results']):
+    print(f"Query {i+1}: {len(query_results['results'])} results")
+```
+
+### Response
+
+```json
+{
+  "results": [
+    {
+      "query": "How do I authenticate?",
+      "results": [
+        {
+          "chunk_id": "ch_xyz789",
+          "content": "...",
+          "score": 0.89
+        }
+      ]
+    },
+    {
+      "query": "What are rate limits?",
+      "results": [...]
+    },
+    {
+      "query": "How to upload documents?",
+      "results": [...]
+    }
+  ],
+  "query_time_ms": 120
+}
+```
+
+## Benefits
+
+- **Faster**: Single request vs multiple
+- **Efficient**: Parallel execution
+- **Cost-effective**: Batch counting
+
+## Limits
+
+- Max 10 queries per batch
+- Same limits as single query

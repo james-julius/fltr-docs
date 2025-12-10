@@ -1,0 +1,100 @@
+---
+title: 'Get Dataset'
+api: 'GET https://api.fltr.com/v1/datasets/{dataset_id}'
+description: 'Retrieve details of a specific dataset'
+---
+
+## Request
+
+Returns detailed information about a dataset including document count and metadata.
+
+### Path Parameters
+
+<ParamField path="dataset_id" type="string" required>
+  The unique dataset identifier (e.g., `ds_abc123`)
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Dataset identifier
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Dataset name
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Dataset description
+</ResponseField>
+
+<ResponseField name="is_public" type="boolean">
+  Public accessibility status
+</ResponseField>
+
+<ResponseField name="document_count" type="integer">
+  Number of documents in dataset
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 creation timestamp
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 last update timestamp
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Custom metadata
+</ResponseField>
+
+## Examples
+
+```bash cURL
+curl https://api.fltr.com/v1/datasets/ds_abc123 \
+  -H "Authorization: Bearer fltr_sk_abc123..."
+```
+
+```python Python
+response = requests.get(
+    "https://api.fltr.com/v1/datasets/ds_abc123",
+    headers={"Authorization": "Bearer fltr_sk_abc123..."}
+)
+dataset = response.json()
+```
+
+### Response
+
+```json
+{
+  "id": "ds_abc123",
+  "name": "Product Documentation",
+  "description": "All product docs and guides",
+  "is_public": false,
+  "document_count": 42,
+  "created_at": "2024-01-10T12:00:00Z",
+  "updated_at": "2024-01-10T15:30:00Z",
+  "metadata": {
+    "category": "documentation",
+    "team": "product"
+  }
+}
+```
+
+## Errors
+
+```json
+{
+  "error": "Dataset not found",
+  "code": "dataset_not_found",
+  "details": {
+    "dataset_id": "ds_invalid"
+  }
+}
+```

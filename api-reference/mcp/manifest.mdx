@@ -1,0 +1,30 @@
+---
+title: 'MCP Manifest'
+api: 'GET https://api.fltr.com/v1/mcp/manifest'
+description: 'Get MCP server capabilities and metadata'
+---
+
+## Request
+
+Returns MCP server manifest with capabilities.
+
+## Response
+
+```json
+{
+  "protocol_version": "2024-11-05",
+  "capabilities": {
+    "resources": true,
+    "tools": true,
+    "prompts": false
+  },
+  "server_info": {
+    "name": "FLTR",
+    "version": "1.0.0"
+  }
+}
+```
+
+## Usage
+
+This endpoint is called by MCP clients during initialization. You typically don't need to call it directly.

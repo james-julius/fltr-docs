@@ -1,33 +1,228 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: 'API Reference'
+description: 'Complete reference for the FLTR REST API'
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+# API Reference
 
-## Welcome
+The FLTR API is organized around REST principles. It has predictable resource-oriented URLs, accepts JSON-encoded request bodies, returns JSON-encoded responses, and uses standard HTTP response codes and authentication.
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+## Base URL
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+```
+https://api.fltr.com/v1
+```
+
+All API requests must be made over HTTPS. HTTP requests will be redirected to HTTPS.
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+FLTR supports three authentication methods:
+
+| Method | Header Format | Rate Limit |
+|--------|--------------|------------|
+| **API Key** | `Authorization: Bearer fltr_sk_...` | 1,000/hour |
+| **OAuth Token** | `Authorization: Bearer fltr_at_...` | 15,000/hour |
+| **Session** | Cookie-based | 15,000/hour |
+
+<Card title="Authentication Guide" icon="key" href="/authentication/overview">
+  Learn how to authenticate with FLTR →
+</Card>
+
+## Request Format
+
+### JSON Bodies
+
+All POST, PUT, and PATCH requests should include `Content-Type: application/json` header with a JSON body:
+
+```bash
+curl -X POST https://api.fltr.com/v1/datasets \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Dataset",
+    "description": "A test dataset"
+  }'
+```
+
+### File Uploads
+
+For file uploads, use `multipart/form-data`:
+
+```bash
+curl -X POST https://api.fltr.com/v1/datasets/ds_abc123/documents \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "file=@document.pdf" \
+  -F 'metadata={"title":"Document"}'
+```
+
+## Response Format
+
+### Success Responses
+
+Successful requests return JSON with appropriate HTTP status codes:
 
 ```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+{
+  "id": "ds_abc123",
+  "name": "My Dataset",
+  "created_at": "2024-01-10T12:00:00Z"
+}
 ```
+
+**Common Success Codes:**
+- `200 OK` - Request succeeded
+- `201 Created` - Resource created successfully
+- `204 No Content` - Request succeeded with no response body
+
+### Error Responses
+
+Errors return JSON with an error message and code:
+
+```json
+{
+  "error": "Dataset not found",
+  "code": "dataset_not_found",
+  "details": {
+    "dataset_id": "ds_invalid"
+  }
+}
+```
+
+**Common Error Codes:**
+- `400 Bad Request` - Invalid request parameters
+- `401 Unauthorized` - Invalid or missing authentication
+- `403 Forbidden` - Insufficient permissions
+- `404 Not Found` - Resource doesn't exist
+- `429 Too Many Requests` - Rate limit exceeded
+- `500 Internal Server Error` - Server error
+
+## Rate Limiting
+
+API requests are limited based on authentication method:
+
+```
+Anonymous:     50 requests/hour
+API Key:       1,000 requests/hour
+OAuth/Session: 15,000 requests/hour
+```
+
+### Rate Limit Headers
+
+All responses include rate limit information:
+
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 847
+X-RateLimit-Reset: 1704657600
+```
+
+- `X-RateLimit-Limit` - Total requests allowed per hour
+- `X-RateLimit-Remaining` - Requests remaining in current window
+- `X-RateLimit-Reset` - Unix timestamp when limit resets
+
+### Rate Limit Exceeded
+
+When you exceed the limit, you'll receive a 429 response:
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "code": "rate_limit_exceeded",
+  "retry_after": 3600
+}
+```
+
+<Card title="Rate Limits Guide" icon="gauge" href="/support/rate-limits">
+  Learn more about rate limiting →
+</Card>
+
+## Pagination
+
+List endpoints support pagination using `limit` and `offset` parameters:
+
+```bash
+GET /v1/datasets?limit=20&offset=40
+```
+
+**Parameters:**
+- `limit` - Number of items per page (default: 20, max: 100)
+- `offset` - Number of items to skip (default: 0)
+
+**Response:**
+```json
+{
+  "datasets": [...],
+  "total": 156,
+  "limit": 20,
+  "offset": 40,
+  "has_more": true
+}
+```
+
+## Idempotency
+
+POST requests that create resources support idempotency keys to safely retry requests:
+
+```bash
+curl -X POST https://api.fltr.com/v1/datasets \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Idempotency-Key: unique-key-123" \
+  -d '{"name":"My Dataset"}'
+```
+
+Requests with the same idempotency key will return the same response, preventing duplicate resource creation.
+
+## Resource Types
+
+### Datasets
+
+Containers for related documents.
+
+<Card title="Datasets API" icon="database" href="/api-reference/datasets/create">
+  Explore dataset endpoints →
+</Card>
+
+### Documents
+
+Files and text content within datasets.
+
+<Card title="Documents API" icon="file" href="/api-reference/documents/upload">
+  Explore document endpoints →
+</Card>
+
+### MCP Endpoints
+
+Model Context Protocol for semantic search.
+
+<Card title="MCP API" icon="magnifying-glass" href="/api-reference/mcp/query">
+  Explore MCP endpoints →
+</Card>
+
+### Webhooks
+
+Event-driven notifications.
+
+<Card title="Webhooks API" icon="webhook" href="/api-reference/webhooks/overview">
+  Explore webhook endpoints →
+</Card>
+
+## Quick Links
+
+<CardGroup cols={2}>
+  <Card title="Create Dataset" icon="plus" href="/api-reference/datasets/create">
+    POST /v1/datasets
+  </Card>
+
+  <Card title="Upload Document" icon="upload" href="/api-reference/documents/upload">
+    POST /v1/datasets/:id/documents
+  </Card>
+
+  <Card title="Query Dataset" icon="magnifying-glass" href="/api-reference/mcp/query">
+    POST /v1/mcp/query
+  </Card>
+
+  <Card title="List Datasets" icon="list" href="/api-reference/datasets/list">
+    GET /v1/datasets
+  </Card>
+</CardGroup>
