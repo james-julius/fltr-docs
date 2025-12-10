@@ -1,0 +1,711 @@
+---
+title: 'n8n Integration'
+description: 'Self-hosted workflow automation with n8n'
+---
+
+# n8n Integration
+
+n8n is an open-source workflow automation tool that you can self-host or use in the cloud. Perfect for developers who want full control over their automation workflows.
+
+## Why n8n?
+
+<CardGroup cols={2}>
+  <Card title="Self-Hosted" icon="server">
+    Deploy on your own infrastructure for complete control
+  </Card>
+
+  <Card title="Open Source" icon="code">
+    Inspect, modify, and extend the platform
+  </Card>
+
+  <Card title="Developer-Friendly" icon="terminal">
+    Code nodes, JavaScript expressions, and custom nodes
+  </Card>
+
+  <Card title="Fair Pricing" icon="dollar-sign">
+    Free self-hosted or affordable cloud plans
+  </Card>
+</CardGroup>
+
+## Installation
+
+### n8n Cloud
+
+Fastest way to get started:
+
+1. Sign up at [n8n.cloud](https://n8n.cloud)
+2. Create your first workflow
+3. No setup required
+
+### Self-Hosted (Docker)
+
+```bash
+# Using Docker
+docker run -it --rm \
+  --name n8n \
+  -p 5678:5678 \
+  -v ~/.n8n:/home/node/.n8n \
+  n8nio/n8n
+
+# Access at http://localhost:5678
+```
+
+### Self-Hosted (npm)
+
+```bash
+npm install n8n -g
+n8n start
+```
+
+<Info>
+For production deployments, see the [n8n deployment guide](https://docs.n8n.io/hosting/).
+</Info>
+
+## Quick Start: FLTR Search Workflow
+
+### Step 1: Create New Workflow
+
+1. Open n8n interface
+2. Click **New workflow**
+3. Name it "FLTR Knowledge Search"
+
+### Step 2: Add HTTP Request Node
+
+1. Click **+** to add node
+2. Search for **HTTP Request**
+3. Configure:
+
+**Method:** `POST`
+
+**URL:** `https://api.fltr.com/v1/mcp/query`
+
+**Authentication:** Generic Credential Type → Header Auth
+- Name: `Authorization`
+- Value: `Bearer YOUR_API_KEY`
+
+**Body Parameters (JSON):**
+```json
+{
+  "query": "{{ $json.query }}",
+  "dataset_id": "ds_abc123",
+  "limit": 5
+}
+```
+
+### Step 3: Test the Node
+
+1. Click **Execute Node**
+2. View results in the output panel
+3. Inspect the JSON response
+
+### Step 4: Process Results
+
+Add a **Code** node to transform results:
+
+```javascript
+// Access FLTR results
+const results = $input.first().json.results;
+
+// Format for output
+const formatted = results.map(result => ({
+  title: result.metadata?.title || 'Untitled',
+  content: result.content,
+  score: Math.round(result.score * 100),
+  chunk_id: result.chunk_id
+}));
+
+return formatted.map(item => ({ json: item }));
+```
+
+## Common Workflows
+
+### 1. Email to Knowledge Base Search
+
+**Nodes:**
+1. **Email Trigger (IMAP)** - Watch inbox
+2. **HTTP Request** - FLTR Query
+3. **Code** - Format results
+4. **Send Email** - Reply with results
+
+**FLTR HTTP Request:**
+```json
+{
+  "query": "{{ $json.subject }} {{ $json.text }}",
+  "dataset_id": "ds_support_kb",
+  "limit": 3,
+  "rerank": true
+}
+```
+
+**Code Node (Format Response):**
+```javascript
+const results = $input.first().json.results;
+
+const response = `
+Hi,
+
+Based on your email, here are some helpful resources:
+
+${results.map((r, i) => `
+${i + 1}. ${r.metadata.title} (${Math.round(r.score * 100)}% match)
+${r.content.substring(0, 200)}...
+`).join('\n')}
+
+Hope this helps!
+`;
+
+return [{ json: { response, to: $('Email Trigger').first().json.from } }];
+```
+
+### 2. Slack Q&A Bot
+
+**Nodes:**
+1. **Slack Trigger** - New message in channel
+2. **IF** - Check if question
+3. **HTTP Request** - FLTR Query
+4. **Slack** - Post reply
+
+**IF Condition:**
+```
+{{ $json.text.includes('?') }}
+```
+
+**FLTR Query:**
+```json
+{
+  "query": "{{ $json.text }}",
+  "dataset_id": "ds_company_kb",
+  "limit": 1
+}
+```
+
+**Slack Reply:**
+```
+{{ $json.results[0].content }}
+
+_Source: {{ $json.results[0].metadata.title }}_
+_Confidence: {{ Math.round($json.results[0].score * 100) }}%_
+```
+
+### 3. Document Indexer Pipeline
+
+**Nodes:**
+1. **Webhook** - Receive document
+2. **Code** - Extract metadata
+3. **HTTP Request** - Upload to FLTR
+4. **Slack** - Send notification
+
+**Code Node (Extract Metadata):**
+```javascript
+const doc = $input.first().json;
+
+return [{
+  json: {
+    content: doc.text,
+    metadata: {
+      title: doc.title,
+      author: doc.author,
+      source: 'API Upload',
+      created_at: new Date().toISOString(),
+      tags: doc.tags || []
+    }
+  }
+}];
+```
+
+**HTTP Request (Upload):**
+```
+Method: POST
+URL: https://api.fltr.com/v1/datasets/ds_abc123/documents
+
+Body:
+{
+  "content": "{{ $json.content }}",
+  "metadata": {{ JSON.stringify($json.metadata) }}
+}
+```
+
+### 4. Customer Support Automation
+
+**Nodes:**
+1. **Webhook Trigger** - New support ticket
+2. **HTTP Request** - FLTR Query
+3. **Switch** - Route by confidence
+4. **Multiple endpoints** - Different actions per route
+
+**Switch Routes:**
+
+Route 1: `{{ $json.results[0].score >= 0.8 }}`
+→ Auto-respond with answer
+
+Route 2: `{{ $json.results[0].score >= 0.5 && $json.results[0].score < 0.8 }}`
+→ Create ticket with suggestions
+
+Route 3: `{{ $json.results[0].score < 0.5 }}`
+→ Escalate to human
+
+## Advanced Techniques
+
+### Using Code Nodes
+
+n8n's Code node supports full JavaScript:
+
+**Example: Filter and rank results**
+```javascript
+// Get FLTR results
+const results = $input.first().json.results;
+
+// Filter by score threshold
+const filtered = results.filter(r => r.score >= 0.7);
+
+// Sort by score (descending)
+const sorted = filtered.sort((a, b) => b.score - a.score);
+
+// Add ranking
+const ranked = sorted.map((r, i) => ({
+  ...r,
+  rank: i + 1,
+  score_percent: Math.round(r.score * 100)
+}));
+
+return ranked.map(item => ({ json: item }));
+```
+
+**Example: Combine multiple queries**
+```javascript
+// Run multiple FLTR queries and combine results
+const query1 = $('HTTP Request 1').first().json.results;
+const query2 = $('HTTP Request 2').first().json.results;
+
+// Merge and deduplicate by chunk_id
+const allResults = [...query1, ...query2];
+const unique = allResults.reduce((acc, curr) => {
+  if (!acc.find(r => r.chunk_id === curr.chunk_id)) {
+    acc.push(curr);
+  }
+  return acc;
+}, []);
+
+// Sort by score
+const sorted = unique.sort((a, b) => b.score - a.score);
+
+return sorted.map(item => ({ json: item }));
+```
+
+### Loop Over Results
+
+Use **Split in Batches** to process each result:
+
+1. Add **Split in Batches** after FLTR query
+2. Set batch size to 1
+3. Connect to action node
+4. Each result processed individually
+
+**Example: Create Notion page for each result**
+```
+Input: {{ $json.results }}
+Batch size: 1
+
+Notion node:
+Title: {{ $json.metadata.title }}
+Content: {{ $json.content }}
+Tags: {{ $json.metadata.category }}
+```
+
+### Error Handling
+
+Add error workflows:
+
+1. On any node, click **Settings** (gear icon)
+2. Enable **Continue On Fail**
+3. Add **IF** node to check for errors
+4. Route failures to error handler
+
+**Error Check:**
+```javascript
+{{ $json.error !== undefined }}
+```
+
+**Error Notification:**
+```
+⚠️ Workflow Error
+
+Node: {{ $node.name }}
+Error: {{ $json.error }}
+Input: {{ JSON.stringify($json) }}
+```
+
+### Scheduling Workflows
+
+Add **Schedule Trigger** for recurring tasks:
+
+**Example: Daily document sync**
+- Trigger: Cron - `0 2 * * *` (2 AM daily)
+- Action: Fetch new documents from source
+- Upload to FLTR
+- Send summary email
+
+### Using Credentials
+
+Store API keys securely:
+
+1. Go to **Credentials** → **New**
+2. Select **Header Auth**
+3. Name: `FLTR API Key`
+4. Header name: `Authorization`
+5. Header value: `Bearer YOUR_API_KEY`
+
+Use in HTTP Request nodes:
+- Authentication: `FLTR API Key`
+
+## All FLTR Endpoints
+
+### Query Dataset
+
+**Node:** HTTP Request
+
+```
+Method: POST
+URL: https://api.fltr.com/v1/mcp/query
+
+Authentication: Header Auth
+Header: Authorization
+Value: Bearer YOUR_API_KEY
+
+Body (JSON):
+{
+  "query": "{{ $json.query }}",
+  "dataset_id": "ds_abc123",
+  "limit": 5,
+  "rerank": false
+}
+```
+
+### Batch Query
+
+```
+URL: https://api.fltr.com/v1/mcp/batch-query
+
+Body:
+{
+  "queries": {{ JSON.stringify($json.queries) }},
+  "dataset_id": "ds_abc123",
+  "limit": 3
+}
+```
+
+### Upload Document
+
+```
+URL: https://api.fltr.com/v1/datasets/DATASET_ID/documents
+
+Body:
+{
+  "content": "{{ $json.content }}",
+  "metadata": {{ JSON.stringify($json.metadata) }}
+}
+```
+
+### Create Dataset
+
+```
+URL: https://api.fltr.com/v1/datasets
+
+Body:
+{
+  "name": "{{ $json.name }}",
+  "description": "{{ $json.description }}",
+  "is_public": false
+}
+```
+
+### List Datasets
+
+```
+Method: GET
+URL: https://api.fltr.com/v1/datasets
+
+Authentication: Header Auth
+```
+
+## Expressions and Functions
+
+### Accessing Data
+
+```javascript
+// Current node data
+{{ $json.field }}
+
+// Previous node data
+{{ $('Node Name').first().json.field }}
+
+// All items from previous node
+{{ $('Node Name').all() }}
+
+// Item by index
+{{ $('Node Name').item.json.field }}
+```
+
+### String Operations
+
+```javascript
+// Substring
+{{ $json.content.substring(0, 100) }}
+
+// Uppercase/lowercase
+{{ $json.title.toUpperCase() }}
+
+// Replace
+{{ $json.text.replace('old', 'new') }}
+
+// Includes
+{{ $json.text.includes('keyword') }}
+```
+
+### Array Operations
+
+```javascript
+// Map
+{{ $json.results.map(r => r.title) }}
+
+// Filter
+{{ $json.results.filter(r => r.score > 0.7) }}
+
+// Join
+{{ $json.tags.join(', ') }}
+
+// Length
+{{ $json.results.length }}
+```
+
+### Math Functions
+
+```javascript
+// Round
+{{ Math.round($json.score * 100) }}
+
+// Max/Min
+{{ Math.max(...$json.scores) }}
+
+// Random
+{{ Math.random() }}
+```
+
+## Rate Limiting
+
+Handle FLTR's rate limits in n8n:
+
+### Method 1: Wait Node
+
+Add **Wait** node between iterations:
+
+```
+Amount: 1
+Unit: Seconds
+```
+
+### Method 2: Code Node Delay
+
+```javascript
+// Add delay before returning
+await new Promise(resolve => setTimeout(resolve, 1000));
+
+return $input.all();
+```
+
+### Method 3: Error Handling
+
+```javascript
+// In error workflow
+if ($json.error?.includes('rate limit')) {
+  // Wait 1 hour
+  await new Promise(resolve => setTimeout(resolve, 3600000));
+
+  // Retry
+  return [{ json: { retry: true } }];
+}
+```
+
+## Webhook Workflows
+
+### Create Webhook Endpoint
+
+1. Add **Webhook** node
+2. Set HTTP Method: `POST`
+3. Copy webhook URL
+4. Configure response
+
+**Webhook Response:**
+```json
+{
+  "status": "success",
+  "results": {{ JSON.stringify($('HTTP Request').first().json.results) }}
+}
+```
+
+### Secure Webhooks
+
+Validate incoming requests:
+
+1. Add **IF** node after webhook
+2. Check secret header:
+
+```
+{{ $json.headers.authorization === 'Bearer YOUR_SECRET' }}
+```
+
+3. Route invalid requests to error response
+
+## Production Best Practices
+
+### 1. Use Environments
+
+Set environment variables:
+
+```bash
+# In docker-compose.yml
+environment:
+  - N8N_ENCRYPTION_KEY=your-key
+  - FLTR_API_KEY=your-api-key
+  - FLTR_DATASET_ID=ds_abc123
+```
+
+Access in workflows:
+```
+{{ $env.FLTR_API_KEY }}
+```
+
+### 2. Enable Execution Data
+
+Keep execution history:
+
+Settings → Workflow Settings:
+- Save execution progress: Yes
+- Save manual executions: Yes
+- Save error executions: Yes
+
+### 3. Add Monitoring
+
+Create monitoring workflow:
+
+- Trigger: Schedule (every 5 minutes)
+- Check: Last execution status
+- Alert: Send notification if failed
+
+### 4. Optimize Performance
+
+- Use **Merge** nodes to combine data
+- Enable **Continue On Fail** for non-critical nodes
+- Use **Split in Batches** for large datasets
+- Cache results with **Set** node
+
+## Complete Example: Support Ticket System
+
+Here's a production-ready workflow:
+
+**Node 1: Webhook**
+```
+HTTP Method: POST
+Path: support-ticket
+Response Mode: When Last Node Finishes
+```
+
+**Node 2: Validate Input**
+```javascript
+// Code node
+const required = ['email', 'subject', 'description'];
+const missing = required.filter(f => !$json[f]);
+
+if (missing.length > 0) {
+  throw new Error(`Missing fields: ${missing.join(', ')}`);
+}
+
+return [$input.first()];
+```
+
+**Node 3: FLTR Query**
+```json
+{
+  "query": "{{ $json.subject }} {{ $json.description }}",
+  "dataset_id": "{{ $env.FLTR_SUPPORT_KB }}",
+  "limit": 5,
+  "rerank": true
+}
+```
+
+**Node 4: Switch (Route by Confidence)**
+
+Route 1: `{{ $json.results[0].score >= 0.8 }}`
+Route 2: `{{ $json.results[0].score >= 0.5 }}`
+Route 3: `{{ $json.results[0].score < 0.5 }}`
+
+**Node 5a: Auto-Response Email**
+```
+To: {{ $('Webhook').first().json.email }}
+Subject: Re: {{ $('Webhook').first().json.subject }}
+
+Hi,
+
+{{ $json.results[0].content }}
+
+Source: {{ $json.results[0].metadata.title }}
+
+If this doesn't help, our team will follow up.
+```
+
+**Node 5b: Create Zendesk Ticket**
+```json
+{
+  "subject": "{{ $('Webhook').first().json.subject }}",
+  "description": "{{ $('Webhook').first().json.description }}",
+  "requester": "{{ $('Webhook').first().json.email }}",
+  "tags": ["fltr-suggested"],
+  "comment": {
+    "body": "Suggested docs:\n{{ $json.results.map(r => r.metadata.title).join('\n') }}"
+  }
+}
+```
+
+**Node 5c: Slack Alert**
+```
+⚠️ Low-confidence ticket
+
+From: {{ $('Webhook').first().json.email }}
+Score: {{ Math.round($json.results[0].score * 100) }}%
+Subject: {{ $('Webhook').first().json.subject }}
+```
+
+**Node 6: Webhook Response**
+```json
+{
+  "status": "processed",
+  "confidence": {{ $('FLTR Query').first().json.results[0].score }},
+  "action": "{{ $runIndex === 0 ? 'auto-responded' : $runIndex === 1 ? 'ticket-created' : 'escalated' }}"
+}
+```
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="n8n Documentation" icon="book" href="https://docs.n8n.io/">
+    Official n8n docs
+  </Card>
+
+  <Card title="FLTR API Reference" icon="code" href="/api-reference/mcp/query">
+    Complete API documentation
+  </Card>
+
+  <Card title="n8n Community" icon="users" href="https://community.n8n.io/">
+    Get help from the community
+  </Card>
+
+  <Card title="Deployment Guide" icon="server" href="https://docs.n8n.io/hosting/">
+    Self-host n8n in production
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- Set up [webhooks](/integrations/webhooks) for real-time events
+- Compare with [Zapier](/integrations/zapier) or [Make](/integrations/make)
+- Explore [API authentication](/authentication/api-keys) options

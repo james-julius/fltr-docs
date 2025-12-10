@@ -1,0 +1,606 @@
+---
+title: 'Make Integration'
+description: 'Build visual automation workflows with Make.com (formerly Integromat)'
+---
+
+# Make Integration
+
+Make (formerly Integromat) is a visual automation platform that lets you connect FLTR to hundreds of apps with a drag-and-drop interface.
+
+## Why Make?
+
+<CardGroup cols={2}>
+  <Card title="Visual Workflow Builder" icon="diagram-project">
+    Design complex automations with an intuitive visual interface
+  </Card>
+
+  <Card title="Advanced Logic" icon="code-branch">
+    Routers, filters, aggregators, and iterators for complex workflows
+  </Card>
+
+  <Card title="Error Handling" icon="triangle-exclamation">
+    Built-in error handlers and retry mechanisms
+  </Card>
+
+  <Card title="Real-time Execution" icon="bolt">
+    Instant triggers and webhooks for immediate processing
+  </Card>
+</CardGroup>
+
+## Prerequisites
+
+- Make account ([make.com](https://www.make.com))
+- FLTR API key from [app.fltr.com](https://app.fltr.com)
+- Dataset ID (e.g., `ds_abc123`)
+
+## Quick Start: Search Knowledge Base
+
+### Step 1: Create a New Scenario
+
+1. Log in to Make
+2. Click **Create a new scenario**
+3. Name it "FLTR Knowledge Search"
+
+### Step 2: Add HTTP Module
+
+1. Click **+** to add a module
+2. Search for **HTTP**
+3. Select **Make a request**
+
+### Step 3: Configure FLTR Request
+
+**URL:**
+```
+https://api.fltr.com/v1/mcp/query
+```
+
+**Method:** `POST`
+
+**Headers:**
+
+| Key | Value |
+|-----|-------|
+| `Authorization` | `Bearer YOUR_API_KEY` |
+| `Content-Type` | `application/json` |
+
+**Body type:** Raw
+
+**Request content:**
+```json
+{
+  "query": "{{1.query}}",
+  "dataset_id": "ds_abc123",
+  "limit": 5
+}
+```
+
+### Step 4: Test the Module
+
+1. Click **Run once**
+2. The module will execute and show results
+3. Click on the module to view the response
+
+### Step 5: Process Results
+
+Add another module to use the search results:
+
+1. Click **+** after the HTTP module
+2. Choose your destination (Slack, Email, etc.)
+3. Map the results using:
+   - `{{2.data.results[].content}}`
+   - `{{2.data.results[].metadata.title}}`
+   - `{{2.data.results[].score}}`
+
+## Common Scenarios
+
+### 1. Gmail to FLTR Search
+
+**Modules:**
+1. **Gmail** → Watch emails
+2. **HTTP** → FLTR Query
+3. **Gmail** → Send reply
+
+**FLTR Query Body:**
+```json
+{
+  "query": "{{1.subject}} {{1.text}}",
+  "dataset_id": "ds_support_kb",
+  "limit": 3,
+  "rerank": true
+}
+```
+
+**Gmail Reply:**
+```
+Hi {{1.from.name}},
+
+Here are some resources that might help:
+
+{{2.data.results[1].metadata.title}}
+{{2.data.results[1].content}}
+
+{{2.data.results[2].metadata.title}}
+{{2.data.results[2].content}}
+
+Best regards
+```
+
+### 2. Slack Q&A Bot
+
+**Modules:**
+1. **Slack** → Watch messages (Instant)
+2. **Router** → Split based on message content
+3. **HTTP** → FLTR Query
+4. **Slack** → Reply in thread
+
+**Router Filter:**
+```
+{{1.text}} contains "?"
+```
+
+**FLTR Query:**
+```json
+{
+  "query": "{{1.text}}",
+  "dataset_id": "ds_company_kb",
+  "limit": 1
+}
+```
+
+**Slack Reply:**
+```
+📚 {{2.data.results[1].metadata.title}}
+
+{{2.data.results[1].content}}
+
+_Relevance: {{formatNumber(2.data.results[1].score; 2)}}%_
+```
+
+### 3. Document Indexer
+
+**Modules:**
+1. **Google Drive** → Watch files
+2. **Google Drive** → Download a file
+3. **HTTP** → FLTR Upload Document
+4. **Slack** → Send notification
+
+**FLTR Upload:**
+
+**URL:** `https://api.fltr.com/v1/datasets/ds_abc123/documents`
+
+**Method:** `POST`
+
+**Body:**
+```json
+{
+  "content": "{{2.data}}",
+  "metadata": {
+    "title": "{{1.name}}",
+    "source": "Google Drive",
+    "drive_id": "{{1.id}}",
+    "created_at": "{{1.createdTime}}"
+  }
+}
+```
+
+### 4. Customer Support Automation
+
+**Modules:**
+1. **Webhook** → Custom webhook
+2. **HTTP** → FLTR Query
+3. **Filter** → High relevance only
+4. **Zendesk** → Create ticket with context
+
+**Filter Condition:**
+```
+{{2.data.results[1].score}} >= 0.7
+```
+
+**Zendesk Ticket:**
+```
+Subject: {{1.customer_email}} - Support Request
+
+Description:
+{{1.message}}
+
+---
+Related Documentation:
+
+{{join(map(2.data.results; "- " + metadata.title + "\n" + content); "\n\n")}}
+```
+
+## Advanced Techniques
+
+### Using Iterators
+
+Process each search result individually:
+
+1. Add **Iterator** module after FLTR query
+2. Connect it to `{{http.data.results}}`
+3. Each result becomes a separate operation
+
+**Example: Send each result to different Slack channel**
+
+```
+Iterator input: {{2.data.results}}
+
+Slack message:
+Channel: #{{iterator.metadata.category}}
+Message: {{iterator.content}}
+```
+
+### Using Aggregators
+
+Combine multiple results into one output:
+
+1. Add **Array aggregator** after iterator
+2. Aggregate field: `{{iterator.content}}`
+3. Join results with separator
+
+**Example: Create single email with all results**
+
+```
+{{join(map(2.data.results; "• " + metadata.title); "\n")}}
+```
+
+### Routers for Conditional Logic
+
+Split workflow based on result quality:
+
+1. Add **Router** after FLTR query
+2. Route 1 filter: `{{2.data.results[1].score}} >= 0.8`
+3. Route 2 filter: `{{2.data.results[1].score}} < 0.8`
+4. Different actions for each route
+
+### Error Handlers
+
+Add error handling to HTTP modules:
+
+1. Right-click HTTP module
+2. Select **Add error handler**
+3. Choose **Error handler route**
+4. Add actions for error cases
+
+**Example error notification:**
+```
+⚠️ FLTR Query Failed
+
+Error: {{error.message}}
+Query: {{1.query}}
+Time: {{now}}
+```
+
+### Data Transformation
+
+Use **Tools** modules to transform data:
+
+**Set Variable:**
+```
+Name: formattedResults
+Value: {{map(2.data.results; metadata.title + ": " + substring(content; 0; 100))}}
+```
+
+**Text Parser:**
+Parse FLTR response for specific fields:
+```
+Pattern: "title": "([^"]+)"
+Text: {{2.data}}
+```
+
+## All FLTR Endpoints for Make
+
+### Query Dataset
+
+**Module:** HTTP - Make a request
+
+**Configuration:**
+```
+URL: https://api.fltr.com/v1/mcp/query
+Method: POST
+
+Headers:
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+
+Body:
+{
+  "query": "{{input}}",
+  "dataset_id": "ds_abc123",
+  "limit": 5,
+  "rerank": false
+}
+```
+
+### Batch Query
+
+Search multiple queries at once:
+
+```
+URL: https://api.fltr.com/v1/mcp/batch-query
+Method: POST
+
+Body:
+{
+  "queries": {{array(1.question1; 1.question2; 1.question3)}},
+  "dataset_id": "ds_abc123",
+  "limit": 3
+}
+```
+
+### Upload Document
+
+```
+URL: https://api.fltr.com/v1/datasets/DATASET_ID/documents
+Method: POST
+
+Body:
+{
+  "content": "{{1.text}}",
+  "metadata": {
+    "title": "{{1.title}}",
+    "source": "Make",
+    "created_at": "{{now}}"
+  }
+}
+```
+
+### Create Dataset
+
+```
+URL: https://api.fltr.com/v1/datasets
+Method: POST
+
+Body:
+{
+  "name": "{{1.name}}",
+  "description": "{{1.description}}",
+  "is_public": false
+}
+```
+
+### List Datasets
+
+```
+URL: https://api.fltr.com/v1/datasets
+Method: GET
+
+Headers:
+Authorization: Bearer YOUR_API_KEY
+```
+
+## Working with Make Variables
+
+### Accessing Array Items
+
+FLTR returns results as an array. Access items:
+
+```
+First result: {{2.data.results[1]}}
+Second result: {{2.data.results[2]}}
+All results: {{2.data.results[]}}
+```
+
+### Mapping Arrays
+
+Transform all results:
+
+```
+{{map(2.data.results; metadata.title)}}
+{{map(2.data.results; content)}}
+{{map(2.data.results; formatNumber(score * 100; 0) + "%")}}
+```
+
+### Filtering Results
+
+Filter by score:
+
+```
+{{filter(2.data.results; score > 0.7)}}
+```
+
+Filter by metadata:
+
+```
+{{filter(2.data.results; metadata.category = "tutorial")}}
+```
+
+### Joining Results
+
+Combine multiple results:
+
+```
+{{join(map(2.data.results; "• " + metadata.title); "\n")}}
+```
+
+## Rate Limiting in Make
+
+Make respects FLTR's rate limits (1,000 req/hour for API keys).
+
+### Handling Rate Limits
+
+1. **Add Sleep Module:**
+   - Between iterations, add **Tools** → **Sleep**
+   - Duration: 1-2 seconds
+
+2. **Error Handler:**
+   ```
+   Filter: {{2.statusCode}} = 429
+   Action: Tools → Sleep (3600 seconds)
+   Then: Resume execution
+   ```
+
+3. **Scheduling:**
+   - Reduce scenario frequency
+   - Schedule runs during off-peak hours
+
+### Monitoring Usage
+
+Add a module to track requests:
+
+1. **Tools** → **Set Variable**
+2. Name: `request_count`
+3. Value: `{{request_count + 1}}`
+4. Add filter when count > 900
+
+## Webhook Triggers
+
+Use Make's instant webhooks for real-time scenarios:
+
+### Step 1: Create Webhook
+
+1. Add **Webhooks** → **Custom webhook**
+2. Click **Add** to create new webhook
+3. Copy the webhook URL
+
+### Step 2: Configure Trigger
+
+Send data to webhook from external source:
+
+```bash
+curl -X POST https://hook.make.com/abc123... \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How do I reset my password?"}'
+```
+
+### Step 3: Process with FLTR
+
+1. Add HTTP module after webhook
+2. Use `{{1.query}}` in FLTR request
+3. Return response to webhook caller
+
+**Enable webhook response:**
+```
+Webhook Response → Status: 200
+Body: {{2.data}}
+```
+
+## Security Best Practices
+
+### Storing API Keys
+
+Never hard-code API keys in scenarios:
+
+1. Go to **Scenario settings**
+2. Add **Environment variable**
+3. Name: `FLTR_API_KEY`
+4. Value: Your API key
+5. Use in headers: `Bearer {{env.FLTR_API_KEY}}`
+
+### Webhook Security
+
+Validate webhook requests:
+
+1. Add **Router** after webhook
+2. Filter: `{{1.secret}} = "your_secret_key"`
+3. Invalid requests go to error handler
+
+### Error Logging
+
+Log errors for debugging:
+
+1. Add **Tools** → **Set variable** in error handler
+2. Send error details to logging service
+3. Include: timestamp, error message, input data
+
+## Complete Example: Support Ticket Automation
+
+Here's a full scenario configuration:
+
+**Module 1: Webhook**
+- Type: Custom webhook
+- Instant trigger
+
+**Module 2: HTTP - FLTR Query**
+```
+URL: https://api.fltr.com/v1/mcp/query
+Method: POST
+
+Headers:
+Authorization: Bearer {{env.FLTR_API_KEY}}
+Content-Type: application/json
+
+Body:
+{
+  "query": "{{1.subject}} {{1.description}}",
+  "dataset_id": "ds_support_docs",
+  "limit": 5,
+  "rerank": true
+}
+```
+
+**Module 3: Router**
+
+Route 1 (High confidence):
+- Filter: `{{2.data.results[1].score}} >= 0.8`
+- Action: Auto-respond with answer
+
+Route 2 (Medium confidence):
+- Filter: `{{2.data.results[1].score}} >= 0.5`
+- Action: Create ticket with suggested docs
+
+Route 3 (Low confidence):
+- Filter: `{{2.data.results[1].score}} < 0.5`
+- Action: Escalate to human agent
+
+**Module 4a: Email - Send auto-response**
+```
+To: {{1.email}}
+Subject: Re: {{1.subject}}
+
+Hi,
+
+Based on your inquiry, here's what might help:
+
+{{2.data.results[1].metadata.title}}
+{{2.data.results[1].content}}
+
+If this doesn't resolve your issue, we'll get back to you soon.
+```
+
+**Module 4b: Zendesk - Create ticket**
+```
+Subject: {{1.subject}}
+Requester: {{1.email}}
+Comment:
+{{1.description}}
+
+---
+Suggested resources:
+{{join(map(2.data.results; "• " + metadata.title); "\n")}}
+```
+
+**Module 4c: Slack - Alert team**
+```
+⚠️ Low-confidence ticket needs attention
+
+From: {{1.email}}
+Subject: {{1.subject}}
+
+Best match: {{formatNumber(2.data.results[1].score * 100; 0)}}%
+```
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="Make Academy" icon="graduation-cap" href="https://www.make.com/en/academy">
+    Learn Make fundamentals
+  </Card>
+
+  <Card title="FLTR API Reference" icon="book" href="/api-reference/mcp/query">
+    Complete API documentation
+  </Card>
+
+  <Card title="Zapier Integration" icon="bolt" href="/integrations/zapier">
+    Alternative: Use Zapier
+  </Card>
+
+  <Card title="API Keys Guide" icon="key" href="/authentication/api-keys">
+    Manage your API keys
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- Try [n8n integration](/integrations/n8n) for self-hosted workflows
+- Set up [webhooks](/integrations/webhooks) for event notifications
+- Explore [Zapier integration](/integrations/zapier) for simpler workflows

@@ -1,0 +1,519 @@
+---
+title: 'Zapier Integration'
+description: 'Connect FLTR to 6,000+ apps with Zapier'
+---
+
+# Zapier Integration
+
+Connect FLTR to thousands of apps using Zapier's Webhooks action. Build powerful automation workflows that combine semantic search with your favorite tools.
+
+## What You Can Build
+
+<CardGroup cols={2}>
+  <Card title="Email Search" icon="envelope">
+    Search email attachments when new messages arrive in Gmail
+  </Card>
+
+  <Card title="Document Q&A" icon="message-question">
+    Answer Slack questions using your knowledge base
+  </Card>
+
+  <Card title="Support Automation" icon="headset">
+    Auto-respond to support tickets with relevant docs
+  </Card>
+
+  <Card title="Content Discovery" icon="magnifying-glass">
+    Find related content when creating new documents
+  </Card>
+</CardGroup>
+
+## Prerequisites
+
+<Steps>
+  <Step title="FLTR Account">
+    Sign up at [app.fltr.com](https://app.fltr.com) if you haven't already
+  </Step>
+
+  <Step title="API Key">
+    Generate an API key in **Settings** → **API Keys**
+  </Step>
+
+  <Step title="Zapier Account">
+    Create a free account at [zapier.com](https://zapier.com)
+  </Step>
+
+  <Step title="Dataset ID">
+    Create a dataset and note its ID (e.g., `ds_abc123`)
+  </Step>
+</Steps>
+
+## Quick Start: Search on New Email
+
+Let's build a Zap that searches your knowledge base when you receive an email.
+
+### Step 1: Create a New Zap
+
+1. Log in to Zapier
+2. Click **Create Zap**
+3. Name it "Email to FLTR Search"
+
+### Step 2: Configure Trigger
+
+1. Search for **Gmail** as the trigger app
+2. Choose event: **New Email**
+3. Connect your Gmail account
+4. Configure filters (optional):
+   - Label: "Support"
+   - Has attachment: Yes
+5. Test the trigger
+
+### Step 3: Add FLTR Search Action
+
+1. Click **+** to add an action
+2. Search for **Webhooks by Zapier**
+3. Choose action event: **POST**
+
+Configure the webhook:
+
+**URL:**
+```
+https://api.fltr.com/v1/mcp/query
+```
+
+**Payload Type:** `JSON`
+
+**Data:**
+```json
+{
+  "query": "{{gmail_subject}} {{gmail_body_plain}}",
+  "dataset_id": "ds_abc123",
+  "limit": 3
+}
+```
+
+**Headers:**
+```
+Authorization: Bearer YOUR_FLTR_API_KEY
+Content-Type: application/json
+```
+
+<Warning>
+Replace `YOUR_FLTR_API_KEY` with your actual API key from the FLTR dashboard.
+</Warning>
+
+### Step 4: Process Results
+
+Add another action to use the search results:
+
+**Example: Send to Slack**
+
+1. Add action: **Slack** → **Send Channel Message**
+2. Configure message:
+
+```
+📧 New support email from {{gmail_from_email}}
+
+Subject: {{gmail_subject}}
+
+🔍 Related docs:
+{{webhooks_response_results_0_content}}
+Source: {{webhooks_response_results_0_metadata_title}}
+
+{{webhooks_response_results_1_content}}
+Source: {{webhooks_response_results_1_metadata_title}}
+```
+
+### Step 5: Test and Enable
+
+1. Click **Test action** to verify it works
+2. Check the results in Slack
+3. Click **Publish** to enable your Zap
+
+## Common Zap Templates
+
+### 1. Slack Q&A Bot
+
+**Trigger:** Slack → New Message in Channel
+**Action:** FLTR → Query Dataset
+**Action:** Slack → Reply in Thread
+
+```json
+{
+  "query": "{{slack_message_text}}",
+  "dataset_id": "ds_your_kb_id",
+  "limit": 1,
+  "rerank": true
+}
+```
+
+### 2. Google Drive Document Indexer
+
+**Trigger:** Google Drive → New File in Folder
+**Action:** Google Drive → Download File
+**Action:** FLTR → Upload Document
+
+```json
+{
+  "file_url": "{{gdrive_file_download_url}}",
+  "metadata": {
+    "title": "{{gdrive_file_name}}",
+    "source": "Google Drive",
+    "created_at": "{{gdrive_file_created_time}}"
+  }
+}
+```
+
+### 3. Customer Support Automation
+
+**Trigger:** Zendesk → New Ticket
+**Action:** FLTR → Query Dataset
+**Action:** Zendesk → Add Private Comment
+
+```json
+{
+  "query": "{{zendesk_ticket_subject}} {{zendesk_ticket_description}}",
+  "dataset_id": "ds_support_docs",
+  "limit": 5
+}
+```
+
+### 4. Content Recommendation Engine
+
+**Trigger:** WordPress → New Post
+**Action:** FLTR → Query Dataset
+**Action:** WordPress → Update Post (add related links)
+
+```json
+{
+  "query": "{{wordpress_post_title}} {{wordpress_post_excerpt}}",
+  "dataset_id": "ds_blog_posts",
+  "limit": 3
+}
+```
+
+## All FLTR Endpoints for Zapier
+
+### Query Dataset
+
+Search your dataset with semantic search.
+
+**URL:** `https://api.fltr.com/v1/mcp/query`
+**Method:** `POST`
+
+**Request Body:**
+```json
+{
+  "query": "search term",
+  "dataset_id": "ds_abc123",
+  "limit": 5,
+  "rerank": false
+}
+```
+
+**Response:**
+```json
+{
+  "results": [
+    {
+      "chunk_id": "ch_xyz789",
+      "content": "Result text...",
+      "score": 0.89,
+      "metadata": {
+        "title": "Document Title"
+      }
+    }
+  ]
+}
+```
+
+**Accessing Results in Zapier:**
+- First result content: `{{webhooks_response_results_0_content}}`
+- First result score: `{{webhooks_response_results_0_score}}`
+- Second result title: `{{webhooks_response_results_1_metadata_title}}`
+
+### Create Dataset
+
+**URL:** `https://api.fltr.com/v1/datasets`
+**Method:** `POST`
+
+```json
+{
+  "name": "{{trigger_value}}",
+  "description": "Created from Zapier",
+  "is_public": false
+}
+```
+
+### Upload Document
+
+**URL:** `https://api.fltr.com/v1/datasets/DATASET_ID/documents`
+**Method:** `POST`
+
+**For text content:**
+```json
+{
+  "content": "{{document_text}}",
+  "metadata": {
+    "title": "{{document_title}}",
+    "source": "Zapier",
+    "created_at": "{{trigger_time}}"
+  }
+}
+```
+
+**For file uploads:**
+Use **Webhooks by Zapier** with **Custom Request** and add file as form data.
+
+### List Datasets
+
+**URL:** `https://api.fltr.com/v1/datasets`
+**Method:** `GET`
+
+No request body needed. Returns all your datasets.
+
+### Batch Query
+
+Search multiple queries at once.
+
+**URL:** `https://api.fltr.com/v1/mcp/batch-query`
+**Method:** `POST`
+
+```json
+{
+  "queries": [
+    "First question",
+    "Second question"
+  ],
+  "dataset_id": "ds_abc123",
+  "limit": 3
+}
+```
+
+## Advanced Techniques
+
+### Filter Results by Metadata
+
+Add filters to your query:
+
+```json
+{
+  "query": "authentication",
+  "dataset_id": "ds_abc123",
+  "filters": {
+    "category": "security",
+    "published": true
+  }
+}
+```
+
+### Enable Reranking
+
+For better result quality, enable Cohere reranking:
+
+```json
+{
+  "query": "search term",
+  "dataset_id": "ds_abc123",
+  "limit": 10,
+  "rerank": true
+}
+```
+
+<Info>
+Reranking costs an additional $0.002 per request but significantly improves result relevance.
+</Info>
+
+### Multi-step Workflows
+
+Build complex workflows:
+
+1. **Trigger:** New form submission (Typeform)
+2. **Action:** FLTR → Query similar submissions
+3. **Filter:** Only continue if similarity > 0.8
+4. **Action:** Send notification about duplicate
+5. **Otherwise:** Create new ticket in Asana
+
+### Error Handling
+
+Add error paths to handle API failures:
+
+1. After FLTR webhook action, click **+**
+2. Add **Filter** step
+3. Condition: `Status Code is not 200`
+4. Send error notification to Slack/email
+
+## Authentication in Zapier
+
+### Using API Keys
+
+Most common method - add API key to headers:
+
+```
+Authorization: Bearer fltr_sk_abc123...
+```
+
+### Storing API Keys Securely
+
+Never hard-code API keys in Zap configurations:
+
+1. Use Zapier's **Storage** to store API key once
+2. Reference it in webhooks: `{{storage_fltr_api_key}}`
+
+**Setup:**
+1. Create a Zap with **Storage by Zapier**
+2. Action: **Set Value**
+3. Key: `fltr_api_key`
+4. Value: Your actual API key
+5. Run once, then delete the Zap
+
+Now reference `{{storage_fltr_api_key}}` in other Zaps.
+
+## Rate Limits
+
+Zapier API requests use your FLTR rate limit:
+
+- **API Key auth:** 1,000 requests/hour
+- **OAuth auth:** 15,000 requests/hour
+
+Tips for staying under limits:
+
+1. **Filter triggers** to reduce unnecessary API calls
+2. **Use delay** between actions in bulk operations
+3. **Batch queries** when searching multiple terms
+4. **Cache results** using Zapier Storage
+
+<Tip>
+Zapier Premium includes automatic retry on rate limit errors.
+</Tip>
+
+## Troubleshooting
+
+### 401 Unauthorized Error
+
+**Cause:** Invalid or missing API key
+
+**Solution:**
+```
+# Correct header format
+Authorization: Bearer fltr_sk_abc123...
+
+# Not this
+Authorization: fltr_sk_abc123...
+```
+
+### Empty Results
+
+**Cause:** Dataset not indexed yet or no matching documents
+
+**Solution:**
+- Wait 30 seconds after uploading documents
+- Try broader search terms
+- Check dataset ID is correct
+
+### 429 Rate Limit Exceeded
+
+**Cause:** Too many requests
+
+**Solution:**
+- Add **Delay** between actions (1-2 seconds)
+- Reduce Zap frequency
+- Upgrade to OAuth authentication
+
+### Response Data Not Accessible
+
+**Cause:** Zapier can't parse the response
+
+**Solution:**
+1. Test the webhook in Zapier
+2. Look at the **Raw Output** tab
+3. Use exact field paths like `results__0__content` (double underscore)
+
+## Example: Complete Email Support Bot
+
+Here's a full Zap configuration for an email support bot:
+
+**Trigger: Gmail - New Email**
+- Label: Support
+- From: Contains "@customer.com"
+
+**Action 1: Webhooks - POST**
+```
+URL: https://api.fltr.com/v1/mcp/query
+Method: POST
+
+Headers:
+Authorization: Bearer {{storage_fltr_api_key}}
+Content-Type: application/json
+
+Body:
+{
+  "query": "{{gmail_subject}} {{gmail_body_plain}}",
+  "dataset_id": "ds_support_kb",
+  "limit": 3,
+  "rerank": true,
+  "filters": {
+    "category": "troubleshooting"
+  }
+}
+```
+
+**Action 2: Filter - Only continue if...**
+```
+{{webhooks_response_results_0_score}} > 0.7
+```
+
+**Action 3: Gmail - Send Email**
+```
+To: {{gmail_from_email}}
+Subject: Re: {{gmail_subject}}
+
+Hi,
+
+I found these resources that might help:
+
+1. {{webhooks_response_results_0_metadata_title}}
+   {{webhooks_response_results_0_content}}
+
+2. {{webhooks_response_results_1_metadata_title}}
+   {{webhooks_response_results_1_content}}
+
+If these don't resolve your issue, our team will follow up shortly.
+
+Best regards,
+Support Bot
+```
+
+**Action 4: Slack - Send Message**
+```
+📧 Auto-responded to {{gmail_from_email}}
+
+Relevance score: {{webhooks_response_results_0_score}}
+
+View email: {{gmail_link}}
+```
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="Zapier Webhooks Docs" icon="link" href="https://zapier.com/apps/webhook/help">
+    Learn about Webhooks by Zapier
+  </Card>
+
+  <Card title="FLTR API Reference" icon="book" href="/api-reference/mcp/query">
+    Complete API documentation
+  </Card>
+
+  <Card title="Make Integration" icon="wand-magic-sparkles" href="/integrations/make">
+    Alternative: Use Make.com
+  </Card>
+
+  <Card title="API Keys Guide" icon="key" href="/authentication/api-keys">
+    Generate and manage API keys
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- Try the [Make integration](/integrations/make) for visual workflows
+- Explore [n8n integration](/integrations/n8n) for self-hosted automation
+- Set up [webhooks](/integrations/webhooks) for real-time notifications

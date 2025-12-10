@@ -1,0 +1,775 @@
+---
+title: 'Webhooks'
+description: 'Receive real-time notifications for dataset and document events'
+---
+
+# Webhooks
+
+Webhooks allow you to receive real-time HTTP notifications when events occur in your FLTR account. Build event-driven workflows without polling the API.
+
+## Overview
+
+FLTR webhooks send HTTP POST requests to your endpoint when:
+- Documents are uploaded or deleted
+- Datasets are created, updated, or deleted
+- Document processing completes
+- Errors occur during processing
+
+<Info>
+**Coming Soon**: The webhook system is currently in design phase. This documentation describes the planned functionality. [Contact us](mailto:support@fltr.com) to join the beta.
+</Info>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Processing Notifications" icon="bell">
+    Get notified when document indexing completes
+  </Card>
+
+  <Card title="Sync Systems" icon="arrows-rotate">
+    Keep external systems in sync with FLTR changes
+  </Card>
+
+  <Card title="Trigger Workflows" icon="bolt">
+    Start automation workflows on FLTR events
+  </Card>
+
+  <Card title="Monitor Activity" icon="chart-line">
+    Track dataset usage and changes in real-time
+  </Card>
+</CardGroup>
+
+## Event Types
+
+### document.uploaded
+
+Fired when a new document is successfully uploaded.
+
+```json
+{
+  "event": "document.uploaded",
+  "timestamp": "2024-01-10T12:00:00Z",
+  "data": {
+    "document_id": "doc_abc123",
+    "dataset_id": "ds_xyz789",
+    "filename": "product-docs.pdf",
+    "size_bytes": 1048576,
+    "status": "processing",
+    "metadata": {
+      "title": "Product Documentation",
+      "category": "docs"
+    }
+  }
+}
+```
+
+### document.processed
+
+Fired when document chunking and embedding is complete.
+
+```json
+{
+  "event": "document.processed",
+  "timestamp": "2024-01-10T12:01:30Z",
+  "data": {
+    "document_id": "doc_abc123",
+    "dataset_id": "ds_xyz789",
+    "chunks_created": 47,
+    "processing_time_ms": 8450,
+    "status": "ready",
+    "embedding_model": "text-embedding-3-small"
+  }
+}
+```
+
+### document.deleted
+
+Fired when a document is deleted.
+
+```json
+{
+  "event": "document.deleted",
+  "timestamp": "2024-01-10T12:05:00Z",
+  "data": {
+    "document_id": "doc_abc123",
+    "dataset_id": "ds_xyz789",
+    "deleted_by": "user_xyz123"
+  }
+}
+```
+
+### dataset.created
+
+Fired when a new dataset is created.
+
+```json
+{
+  "event": "dataset.created",
+  "timestamp": "2024-01-10T11:00:00Z",
+  "data": {
+    "dataset_id": "ds_xyz789",
+    "name": "Product Knowledge Base",
+    "description": "Documentation for all products",
+    "is_public": false,
+    "created_by": "user_xyz123"
+  }
+}
+```
+
+### dataset.updated
+
+Fired when dataset metadata is updated.
+
+```json
+{
+  "event": "dataset.updated",
+  "timestamp": "2024-01-10T12:10:00Z",
+  "data": {
+    "dataset_id": "ds_xyz789",
+    "changes": {
+      "name": "Updated Product KB",
+      "description": "All product documentation"
+    },
+    "updated_by": "user_xyz123"
+  }
+}
+```
+
+### dataset.deleted
+
+Fired when a dataset is deleted.
+
+```json
+{
+  "event": "dataset.deleted",
+  "timestamp": "2024-01-10T13:00:00Z",
+  "data": {
+    "dataset_id": "ds_xyz789",
+    "document_count": 42,
+    "deleted_by": "user_xyz123"
+  }
+}
+```
+
+### document.processing_failed
+
+Fired when document processing encounters an error.
+
+```json
+{
+  "event": "document.processing_failed",
+  "timestamp": "2024-01-10T12:02:00Z",
+  "data": {
+    "document_id": "doc_abc123",
+    "dataset_id": "ds_xyz789",
+    "error": {
+      "code": "invalid_pdf",
+      "message": "PDF file is corrupted or encrypted",
+      "details": "Unable to extract text from PDF"
+    }
+  }
+}
+```
+
+## Creating Webhooks
+
+### Via Dashboard (Coming Soon)
+
+1. Log in to [app.fltr.com](https://app.fltr.com)
+2. Go to **Settings** → **Webhooks**
+3. Click **Create Webhook**
+4. Configure:
+   - **URL**: Your endpoint (must be HTTPS in production)
+   - **Events**: Select which events to receive
+   - **Secret**: Auto-generated signature secret
+5. Click **Create**
+
+### Via API (Planned)
+
+```bash
+curl -X POST https://api.fltr.com/v1/webhooks \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-app.com/webhooks/fltr",
+    "events": [
+      "document.uploaded",
+      "document.processed",
+      "document.processing_failed"
+    ],
+    "description": "Production webhook",
+    "active": true
+  }'
+```
+
+Response:
+```json
+{
+  "webhook_id": "wh_abc123",
+  "url": "https://your-app.com/webhooks/fltr",
+  "events": ["document.uploaded", "document.processed", "document.processing_failed"],
+  "secret": "whsec_xyz789...",
+  "created_at": "2024-01-10T12:00:00Z",
+  "active": true
+}
+```
+
+## Receiving Webhooks
+
+### Basic Endpoint
+
+<CodeGroup>
+
+```python Python (Flask)
+from flask import Flask, request, jsonify
+import hmac
+import hashlib
+
+app = Flask(__name__)
+WEBHOOK_SECRET = "whsec_xyz789..."
+
+@app.route('/webhooks/fltr', methods=['POST'])
+def fltr_webhook():
+    # Verify signature
+    signature = request.headers.get('X-FLTR-Signature')
+    body = request.get_data()
+
+    expected = hmac.new(
+        WEBHOOK_SECRET.encode(),
+        body,
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(signature, expected):
+        return jsonify({'error': 'Invalid signature'}), 401
+
+    # Process event
+    event = request.json
+
+    if event['event'] == 'document.processed':
+        handle_document_processed(event['data'])
+    elif event['event'] == 'document.processing_failed':
+        handle_processing_error(event['data'])
+
+    return jsonify({'received': True}), 200
+
+def handle_document_processed(data):
+    print(f"Document {data['document_id']} processed with {data['chunks_created']} chunks")
+    # Your logic here
+
+def handle_processing_error(data):
+    print(f"Processing failed: {data['error']['message']}")
+    # Send alert, retry, etc.
+```
+
+```javascript Node.js (Express)
+const express = require('express');
+const crypto = require('crypto');
+
+const app = express();
+const WEBHOOK_SECRET = 'whsec_xyz789...';
+
+app.use(express.raw({ type: 'application/json' }));
+
+app.post('/webhooks/fltr', (req, res) => {
+  // Verify signature
+  const signature = req.headers['x-fltr-signature'];
+  const body = req.body;
+
+  const expected = crypto
+    .createHmac('sha256', WEBHOOK_SECRET)
+    .update(body)
+    .digest('hex');
+
+  if (signature !== expected) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  // Process event
+  const event = JSON.parse(body);
+
+  switch (event.event) {
+    case 'document.processed':
+      handleDocumentProcessed(event.data);
+      break;
+    case 'document.processing_failed':
+      handleProcessingError(event.data);
+      break;
+  }
+
+  res.json({ received: true });
+});
+
+function handleDocumentProcessed(data) {
+  console.log(`Document ${data.document_id} processed`);
+  // Your logic here
+}
+
+function handleProcessingError(data) {
+  console.log(`Processing failed: ${data.error.message}`);
+  // Send alert, retry, etc.
+}
+
+app.listen(3000);
+```
+
+```go Go
+package main
+
+import (
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/hex"
+    "encoding/json"
+    "io"
+    "net/http"
+)
+
+const webhookSecret = "whsec_xyz789..."
+
+type WebhookEvent struct {
+    Event     string                 `json:"event"`
+    Timestamp string                 `json:"timestamp"`
+    Data      map[string]interface{} `json:"data"`
+}
+
+func webhookHandler(w http.ResponseWriter, r *http.Request) {
+    // Read body
+    body, err := io.ReadAll(r.Body)
+    if err != nil {
+        http.Error(w, "Invalid request", 400)
+        return
+    }
+
+    // Verify signature
+    signature := r.Header.Get("X-FLTR-Signature")
+    mac := hmac.New(sha256.New, []byte(webhookSecret))
+    mac.Write(body)
+    expected := hex.EncodeToString(mac.Sum(nil))
+
+    if !hmac.Equal([]byte(signature), []byte(expected)) {
+        http.Error(w, "Invalid signature", 401)
+        return
+    }
+
+    // Parse event
+    var event WebhookEvent
+    json.Unmarshal(body, &event)
+
+    switch event.Event {
+    case "document.processed":
+        handleDocumentProcessed(event.Data)
+    case "document.processing_failed":
+        handleProcessingError(event.Data)
+    }
+
+    w.WriteHeader(200)
+    json.NewEncoder(w).Encode(map[string]bool{"received": true})
+}
+
+func main() {
+    http.HandleFunc("/webhooks/fltr", webhookHandler)
+    http.ListenAndServe(":3000", nil)
+}
+```
+
+</CodeGroup>
+
+## Security
+
+### Signature Verification
+
+FLTR signs every webhook with HMAC-SHA256:
+
+```
+X-FLTR-Signature: <hex-encoded-signature>
+```
+
+**Always verify signatures** to ensure requests came from FLTR:
+
+<CodeGroup>
+
+```python Python
+import hmac
+import hashlib
+
+def verify_signature(secret, signature, body):
+    expected = hmac.new(
+        secret.encode(),
+        body,
+        hashlib.sha256
+    ).hexdigest()
+
+    return hmac.compare_digest(signature, expected)
+
+# Usage
+if not verify_signature(WEBHOOK_SECRET, signature, request.body):
+    raise Exception("Invalid signature")
+```
+
+```javascript JavaScript
+const crypto = require('crypto');
+
+function verifySignature(secret, signature, body) {
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(body)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expected)
+  );
+}
+
+// Usage
+if (!verifySignature(WEBHOOK_SECRET, signature, body)) {
+  throw new Error('Invalid signature');
+}
+```
+
+</CodeGroup>
+
+### Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use HTTPS in production">
+    FLTR will only send webhooks to HTTPS endpoints in production. HTTP is allowed for development/testing with localhost URLs only.
+  </Accordion>
+
+  <Accordion title="Always verify signatures">
+    Never trust webhook payloads without signature verification. Attackers could forge requests.
+  </Accordion>
+
+  <Accordion title="Rotate webhook secrets">
+    Rotate secrets periodically (every 90 days) or immediately if compromised.
+  </Accordion>
+
+  <Accordion title="Return 200 quickly">
+    Respond with 200 OK within 5 seconds. Process events asynchronously:
+
+    ```python
+    @app.route('/webhooks/fltr', methods=['POST'])
+    def webhook():
+        # Verify signature
+        if not verify_signature(...):
+            return jsonify({'error': 'Invalid'}), 401
+
+        # Queue for async processing
+        queue.enqueue(process_webhook, request.json)
+
+        # Return immediately
+        return jsonify({'received': True}), 200
+    ```
+  </Accordion>
+
+  <Accordion title="Handle duplicate events">
+    Use event IDs to detect and ignore duplicates:
+
+    ```python
+    processed_events = set()
+
+    def handle_event(event):
+        event_id = event['id']  # Each event has unique ID
+
+        if event_id in processed_events:
+            return  # Already processed
+
+        # Process event
+        process(event)
+
+        # Mark as processed
+        processed_events.add(event_id)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Retry Logic
+
+### How Retries Work
+
+If your endpoint fails (non-200 status or timeout), FLTR will retry:
+
+- **Retry attempts**: Up to 3 retries
+- **Backoff**: Exponential (1min, 5min, 30min)
+- **Timeout**: 5 seconds per request
+- **Failure**: Webhook marked as failed after 3 failures
+
+### Handling Retries
+
+Return these status codes appropriately:
+
+| Code | Meaning | FLTR Action |
+|------|---------|-------------|
+| 200-299 | Success | Mark delivered, no retry |
+| 400-499 | Client error | No retry (likely bad webhook config) |
+| 500-599 | Server error | Retry with backoff |
+| Timeout | No response | Retry with backoff |
+
+**Example: Temporary vs Permanent Errors**
+
+```python
+@app.route('/webhooks/fltr', methods=['POST'])
+def webhook():
+    try:
+        process_event(request.json)
+        return jsonify({'received': True}), 200
+
+    except TemporaryError as e:
+        # Retry - return 500
+        return jsonify({'error': str(e)}), 503
+
+    except PermanentError as e:
+        # Don't retry - return 400
+        return jsonify({'error': str(e)}), 400
+```
+
+## Testing Webhooks
+
+### Local Testing with ngrok
+
+Expose local endpoint for testing:
+
+```bash
+# Start your local server
+python app.py  # Running on :5000
+
+# Start ngrok
+ngrok http 5000
+
+# Use ngrok URL as webhook endpoint
+# https://abc123.ngrok.io/webhooks/fltr
+```
+
+### Manual Testing
+
+Simulate webhook events:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST http://localhost:5000/webhooks/fltr \
+  -H "Content-Type: application/json" \
+  -H "X-FLTR-Signature: $(echo -n '{"event":"document.processed"}' | openssl dgst -sha256 -hmac 'whsec_xyz789' | cut -d' ' -f2)" \
+  -d '{
+    "event": "document.processed",
+    "timestamp": "2024-01-10T12:00:00Z",
+    "data": {
+      "document_id": "doc_test123",
+      "dataset_id": "ds_test456",
+      "chunks_created": 10,
+      "status": "ready"
+    }
+  }'
+```
+
+```python Python
+import requests
+import hmac
+import hashlib
+import json
+
+payload = {
+    "event": "document.processed",
+    "timestamp": "2024-01-10T12:00:00Z",
+    "data": {
+        "document_id": "doc_test123",
+        "chunks_created": 10
+    }
+}
+
+body = json.dumps(payload)
+signature = hmac.new(
+    b'whsec_xyz789',
+    body.encode(),
+    hashlib.sha256
+).hexdigest()
+
+response = requests.post(
+    'http://localhost:5000/webhooks/fltr',
+    headers={
+        'Content-Type': 'application/json',
+        'X-FLTR-Signature': signature
+    },
+    data=body
+)
+
+print(response.status_code, response.json())
+```
+
+</CodeGroup>
+
+### Test Mode (Coming Soon)
+
+FLTR will provide test mode webhooks:
+
+```bash
+curl -X POST https://api.fltr.com/v1/webhooks/test \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "webhook_id": "wh_abc123",
+    "event": "document.processed"
+  }'
+```
+
+## Monitoring Webhooks
+
+### Webhook Logs (Planned)
+
+View webhook delivery attempts in the dashboard:
+
+- Delivery status (success/failed)
+- Response codes and times
+- Error messages
+- Retry attempts
+- Event payloads
+
+### Alerts
+
+Set up alerts for webhook failures:
+
+```python
+@app.route('/webhooks/fltr', methods=['POST'])
+def webhook():
+    try:
+        process_event(request.json)
+        return jsonify({'received': True}), 200
+
+    except Exception as e:
+        # Alert your team
+        send_alert(f"Webhook processing failed: {str(e)}")
+
+        # Return 500 to trigger retry
+        return jsonify({'error': 'Internal error'}), 500
+```
+
+## Common Use Cases
+
+### 1. Slack Notifications
+
+Get notified when documents are processed:
+
+```python
+import requests
+
+def handle_document_processed(data):
+    requests.post(
+        'https://hooks.slack.com/services/YOUR/WEBHOOK/URL',
+        json={
+            'text': f"✅ Document processed: {data['document_id']}",
+            'attachments': [{
+                'fields': [
+                    {'title': 'Chunks', 'value': str(data['chunks_created'])},
+                    {'title': 'Time', 'value': f"{data['processing_time_ms']}ms"}
+                ]
+            }]
+        }
+    )
+```
+
+### 2. Database Sync
+
+Keep external database in sync:
+
+```python
+def handle_dataset_created(data):
+    db.datasets.insert({
+        'fltr_id': data['dataset_id'],
+        'name': data['name'],
+        'description': data['description'],
+        'synced_at': datetime.now()
+    })
+
+def handle_dataset_deleted(data):
+    db.datasets.delete({
+        'fltr_id': data['dataset_id']
+    })
+```
+
+### 3. Workflow Trigger
+
+Start automation on document upload:
+
+```python
+def handle_document_uploaded(data):
+    # Trigger workflow (e.g., Zapier webhook)
+    requests.post(
+        'https://hooks.zapier.com/hooks/catch/...',
+        json={
+            'document_id': data['document_id'],
+            'dataset_id': data['dataset_id'],
+            'action': 'process_new_document'
+        }
+    )
+```
+
+### 4. Error Monitoring
+
+Track processing failures:
+
+```python
+def handle_processing_failed(data):
+    # Log to error tracking service
+    sentry_sdk.capture_message(
+        f"FLTR document processing failed",
+        level="error",
+        extras={
+            'document_id': data['document_id'],
+            'error_code': data['error']['code'],
+            'error_message': data['error']['message']
+        }
+    )
+
+    # Retry or alert team
+    if data['error']['code'] == 'temporary_error':
+        queue_retry(data['document_id'])
+    else:
+        alert_team(data)
+```
+
+## Webhook Headers
+
+FLTR sends these headers with every webhook:
+
+```
+Content-Type: application/json
+X-FLTR-Signature: <hmac-sha256-signature>
+X-FLTR-Event: <event-type>
+X-FLTR-Delivery: <delivery-attempt-id>
+User-Agent: FLTR-Webhooks/1.0
+```
+
+Access in your handler:
+
+```python
+event_type = request.headers.get('X-FLTR-Event')
+delivery_id = request.headers.get('X-FLTR-Delivery')
+```
+
+## Rate Limits
+
+Webhook deliveries don't count toward your API rate limit. However:
+
+- Max 100 webhooks per account
+- Max 1000 deliveries per hour per webhook
+- Webhooks failing >80% over 24h will be auto-disabled
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api-reference/webhooks/overview">
+    Complete webhook API documentation
+  </Card>
+
+  <Card title="Event Schemas" icon="code" href="/api-reference/webhooks/events">
+    Detailed event payload schemas
+  </Card>
+
+  <Card title="Security Guide" icon="lock" href="/api-reference/webhooks/security">
+    Webhook security best practices
+  </Card>
+
+  <Card title="Join Beta" icon="flask" href="mailto:support@fltr.com">
+    Get early access to webhooks
+  </Card>
+</CardGroup>
