@@ -413,8 +413,8 @@ export class Fltr implements INodeType {
                         const enableReranking = this.getNodeParameter('enableReranking', i) as boolean;
 
                         // Build query URL
-                        const url = `${apiUrl}/mcp/query/${datasetId}/n8n`;
                         const queryParams = new URLSearchParams({
+                            datasetId,
                             query,
                             limit: limit.toString(),
                             search_mode: searchMode,
@@ -424,7 +424,7 @@ export class Fltr implements INodeType {
                         // Make request
                         const response = await this.helpers.httpRequest({
                             method: 'GET',
-                            url: `${url}?${queryParams}`,
+                            url: `${apiUrl}/mcp/query?${queryParams}`,
                             returnFullResponse: false,
                         });
 

@@ -291,7 +291,7 @@ curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${PRIVATE_DATASET_ID}&query=tes
 
 **Test Case 2.3.3: Access Public Dataset (Unauthenticated)**
 ```bash
-curl -X GET "${FLTR_API_URL}/mcp/query/${PUBLIC_DATASET_ID}/test?query=test&limit=5"
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${PUBLIC_DATASET_ID}&query=test&limit=5"
 
 # Verify:
 # ✅ Status: 200 (if anonymous access enabled)
@@ -531,9 +531,7 @@ curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test" 
 2. Add "Manual Trigger" node
 3. Add "HTTP Request" node:
    - Method: GET
-   - URL: `https://api.fltr.com/v1/mcp/query/{{$json.dataset_id}}/test`
-   - Query Parameters:
-     - query: `{{$json.query}}`
+   - URL: `https://api.fltr.com/v1/mcp/query?datasetId={{$json.dataset_id}}&query={{$json.query}}&limit=10`
      - limit: 5
    - Authentication: Generic Credential Type → Header Auth
      - Name: `Authorization`
@@ -562,8 +560,7 @@ curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test" 
 1. Email Trigger (IMAP) - Watch inbox
 2. HTTP Request - FLTR Query:
    ```
-   URL: https://api.fltr.com/v1/mcp/query/DATASET_ID/support
-   Query: {{$json.subject}} {{$json.text}}
+   URL: https://api.fltr.com/v1/mcp/query?datasetId=DATASET_ID&query={{$json.subject}}+{{$json.text}}&limit=5
    ```
 3. Code Node - Format results
 4. Send Email - Reply with results
@@ -690,7 +687,7 @@ curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=${TEST_DATASET_ID}&query=test" 
 
 **Test Case 6.1.3: 404 Not Found**
 ```bash
-curl -X GET "${FLTR_API_URL}/mcp/query/00000000-0000-0000-0000-000000000000/test?query=test" \
+curl -X GET "${FLTR_API_URL}/mcp/query?datasetId=00000000-0000-0000-0000-000000000000&query=test" \
   -H "Authorization: Bearer ${FLTR_API_KEY}"
 
 # Verify:
